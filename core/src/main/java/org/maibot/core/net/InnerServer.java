@@ -87,7 +87,7 @@ public class InnerServer {
             this.bossGroup.shutdownGracefully().sync();
             this.workerGroup.shutdownGracefully().sync();
         } catch (Exception e) {
-            log.error("网络服务关闭时发生错误", e);
+            log.error("关闭网络服务时发生错误", e);
         }
     }
 }

@@ -3,23 +3,19 @@ package org.maibot.core.db;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
 import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.maibot.core.config.MainConfig;
-import org.maibot.core.db.dao.DatabaseVersion;
 import org.maibot.core.cdi.annotation.AutoInject;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.cdi.annotation.Value;
+import org.maibot.core.config.MainConfig;
+import org.maibot.core.db.dao.DatabaseVersion;
+import org.maibot.core.util.ClassScanner;
 import org.semver4j.Semver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.URL;
-import java.util.*;
-import java.util.function.BiFunction;
+import java.util.Set;
 import java.util.function.Function;
 
 @Component
@@ -32,40 +28,6 @@ public class DatabaseService {
     @AutoInject
     DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf) {
         this.init(conf);
-    }
-
-    /**
-     * 自动扫描实体类
-     *
-     * @return 实体类列表
-     */
-    private static List<Class<?>> scanEntityClasses(String packageName) {
-        // 通过Reflect自动扫描指定包下被@Entity注解的类
-        Enumeration<URL> dirs;
-        try {
-            dirs = Thread.currentThread().getContextClassLoader().getResources(packageName.replace(".", "/"));
-            while (dirs.hasMoreElements()) {
-                var url = dirs.nextElement();
-                var dir = new File(url.getFile());
-                if (dir.isDirectory()) {
-                    var classes = new java.util.ArrayList<Class<?>>();
-                    for (var file : Objects.requireNonNull(dir.listFiles())) {
-                        if (file.getName().endsWith(".class")) {
-                            var className = packageName + '.' + file.getName().substring(0, file.getName().length() - 6);
-                            var clazz = Class.forName(className);
-                            if (clazz.isAnnotationPresent(jakarta.persistence.Entity.class)) {
-                                classes.add(clazz);
-                                log.debug("Found entity class: {}", className);
-                            }
-                        }
-                    }
-                    return classes;
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to scan entity classes in package: " + packageName, e);
-        }
-        return List.of();
     }
 
     private static PersistenceConfiguration getDbConfiguration(MainConfig.LocalData.Database conf) {
@@ -111,7 +73,20 @@ public class DatabaseService {
             var cfg = getDbConfiguration(conf);
 
             // 注册实体类
-            scanEntityClasses("org.maibot.core.db.dao").forEach(clazz -> {
+            Set<Class<?>> entityClasses =
+                    ClassScanner.fileScan(
+                            "org.maibot.core.db.dao",
+                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+                    );
+            entityClasses.addAll(
+                    ClassScanner.jarScan(
+                            Thread.currentThread().getContextClassLoader(),
+                            "org.maibot.core.db.dao",
+                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+                    )
+            );
+
+            entityClasses.forEach(clazz -> {
                 log.debug("Registering entity class: {}", clazz.getName());
                 cfg.managedClass(clazz);
             });
@@ -136,7 +111,11 @@ public class DatabaseService {
      */
     public void close() {
         if (this.entityManagerFactory != null) {
-            this.entityManagerFactory.close();
+            try {
+                this.entityManagerFactory.close();
+            } catch (Exception e) {
+                log.error("关闭数据库服务时发生错误", e);
+            }
             this.entityManagerFactory = null;
         }
     }

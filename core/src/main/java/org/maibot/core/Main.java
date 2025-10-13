@@ -5,7 +5,7 @@ import org.maibot.core.config.VersionInfo;
 import org.maibot.core.db.DatabaseService;
 import org.maibot.core.cdi.InstanceManager;
 import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.event.SystemChannel;
+import org.maibot.core.event.SystemEventService;
 import org.maibot.core.log.LogConfig;
 import org.maibot.core.net.InnerServer;
 import org.maibot.core.util.TaskExecutorService;
@@ -17,11 +17,13 @@ public class Main {
 
     private final TaskExecutorService taskExecutorService;
     private final InnerServer innerServer;
+    private final TerminalController terminalController;
 
     @AutoInject
-    public Main(TaskExecutorService taskExecutorService, InnerServer innerServer) {
+    public Main(TaskExecutorService taskExecutorService, InnerServer innerServer, TerminalController terminalController) {
         this.taskExecutorService = taskExecutorService;
         this.innerServer = innerServer;
+        this.terminalController = terminalController;
     }
 
     public int run() {
@@ -29,10 +31,14 @@ public class Main {
         var timer = System.currentTimeMillis();
 
         log.info("正在启动网络服务...");
-        this.innerServer.run();
+        this.taskExecutorService.submit(this.innerServer::run, true);
 
         // TODO: 初始化决策中枢
         // TODO: 初始化Mod管理器并进行模块加载
+
+        // 启动终端
+        log.info("正在启动终端...");
+        this.terminalController.runTerminal();
 
         return 0;
     }
@@ -58,7 +64,7 @@ public class Main {
         var databaseService = InstanceManager.getInstance(DatabaseService.class);
 
         log.info("初始化事件通道...");
-        var systemChannel = InstanceManager.getInstance(SystemChannel.class);
+        var systemChannel = InstanceManager.getInstance(SystemEventService.class);
 
         log.info("初始化网络服务...");
         var innerServer = InstanceManager.getInstance(InnerServer.class);

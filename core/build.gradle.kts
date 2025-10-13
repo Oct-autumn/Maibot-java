@@ -2,6 +2,7 @@ import java.time.Instant
 
 plugins {
     id("java")
+    id("com.gradleup.shadow") version "9.2.2"
 }
 
 group = "org.maibot.core"
@@ -66,7 +67,16 @@ tasks.register("createVersionProperties") {
     }
 }
 
-tasks.named("processResources") {
+tasks.named("compileJava") {
     dependsOn(":sdk:jar")
+}
+
+tasks.named("processResources") {
     dependsOn("createVersionProperties")
+}
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "org.maibot.core.Main"
+    }
 }

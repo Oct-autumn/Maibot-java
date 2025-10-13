@@ -13,6 +13,7 @@ import org.maibot.core.config.MainConfig;
 import org.maibot.core.util.PrefixTreeMap;
 import org.slf4j.LoggerFactory;
 
+import java.io.OutputStream;
 import java.util.*;
 
 public class LogConfig {
@@ -26,19 +27,19 @@ public class LogConfig {
 
         rootLogger.addAppender(getConsoleAppender(context, conf.console));
 
-        if (AVAL_LEVELS.contains(conf.file.level.toUpperCase()) && conf.file.level.toUpperCase() != "OFF") {
+        if (AVAL_LEVELS.contains(conf.file.level.toUpperCase()) && !conf.file.level.equalsIgnoreCase("OFF")) {
             // 确保日志目录存在
             java.io.File logDir = new java.io.File(conf.file.path);
-            if (!logDir.exists()) {
-                logDir.mkdirs();
+            if (!logDir.exists() && logDir.mkdirs()) {
+                System.out.println("创建日志目录: " + logDir.getAbsolutePath());
             }
             rootLogger.addAppender(getFileAppender(context, conf.file));
         }
     }
 
-
     private static ConsoleAppender<ILoggingEvent> getConsoleAppender(LoggerContext context, MainConfig.Log.ConsoleLogSettings conf) {
         ConsoleAppender<ILoggingEvent> consoleAppender = new ConsoleAppender<>();
+        consoleAppender.setName("console");
         consoleAppender.setContext(context);
 
         {
@@ -73,6 +74,7 @@ public class LogConfig {
 
     private static FileAppender<ILoggingEvent> getFileAppender(LoggerContext context, MainConfig.Log.FileLogSettings conf) {
         FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
+        fileAppender.setName("file");
         fileAppender.setContext(context);
         fileAppender.setFile(conf.path + "/maibot.log");
 
@@ -117,6 +119,15 @@ public class LogConfig {
         }
 
         fileFilter.addRule(packageName, Level.valueOf(level));
+    }
+
+    public static void redirectConsoleOutputStream(OutputStream os) {
+        var appender = ((LoggerContext) LoggerFactory.getILoggerFactory())
+                .getLogger("ROOT")
+                .getAppender("console");
+        if (appender instanceof ConsoleAppender<ILoggingEvent> consoleAppender) {
+            consoleAppender.setOutputStream(os);
+        }
     }
 }
 

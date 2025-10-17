@@ -37,6 +37,7 @@ public class DatabaseService {
         cfg.property("hibernate.connection.driver_class", "org.sqlite.JDBC");
         cfg.property("hibernate.connection.url", "jdbc:sqlite:" + conf.sqlitePath);
         cfg.property("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
+        cfg.property("hibernate.hbm2ddl.auto", "update");
         cfg.property("hibernate.c3p0.min_size", 1);
         cfg.property("hibernate.c3p0.max_size", 1);
         cfg.property("hibernate.c3p0.timeout", 0);
@@ -56,6 +57,7 @@ public class DatabaseService {
     public void init(MainConfig.LocalData.Database conf) {
         try {
             // 检查sqlitePath文件是否存在，不存在则创建
+
             var dbFile = new File(conf.sqlitePath);
             if (!dbFile.exists()) {
                 var parent = dbFile.getParentFile();
@@ -92,6 +94,7 @@ public class DatabaseService {
             });
 
             this.entityManagerFactory = new HibernatePersistenceProvider().createEntityManagerFactory(cfg);
+
 
             // 检查数据库版本
             Semver dbVer = getDbVer();

@@ -7,6 +7,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.*;
 
+/**
+ * 任务执行器服务
+ * <p>
+ * 提供线程池和虚拟线程池用于任务执行
+ */
 @Component
 public class TaskExecutorService {
     private static final Logger log = LoggerFactory.getLogger(TaskExecutorService.class);
@@ -28,6 +33,13 @@ public class TaskExecutorService {
         this.virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
+    /**
+     * 提交任务到执行器
+     *
+     * @param task 任务Func
+     * @param virT 是否使用虚拟线程
+     * @return 任务Future
+     */
     public Future<?> submit(Runnable task, boolean virT) {
         if (virT) {
             return this.virtualExecutor.submit(task);
@@ -36,6 +48,9 @@ public class TaskExecutorService {
         }
     }
 
+    /**
+     * 关闭任务执行器
+     */
     public void shutdown() {
         try {
             this.executor.shutdown();

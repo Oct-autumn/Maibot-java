@@ -38,7 +38,7 @@ public class Main {
 
         // 启动终端
         log.info("正在启动终端...");
-        this.terminalController.runTerminal();
+        this.terminalController.runCommandline();
 
         return 0;
     }
@@ -73,7 +73,7 @@ public class Main {
 
         log.info("注册关闭钩子...");
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("正在关闭 MaiBot...");
+            log.warn("正在关闭 MaiBot...");
             innerServer.shutdown();
             systemChannel.close();
             databaseService.close();

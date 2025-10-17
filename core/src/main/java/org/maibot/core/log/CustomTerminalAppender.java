@@ -14,7 +14,6 @@ import java.util.Arrays;
 
 public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final Logger log = LoggerFactory.getLogger(CustomTerminalAppender.class);
 
     @Setter
     private LineReader lineReader;

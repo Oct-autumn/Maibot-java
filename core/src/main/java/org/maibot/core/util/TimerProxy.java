@@ -11,11 +11,15 @@ public class TimerProxy {
         log.debug(format, (endTime - startTime));
     }
 
+    public static void start(Runnable task, String format, String loggerName) {
+        start(task, format, LoggerFactory.getLogger(loggerName));
+    }
+
     public static void start(Runnable task, String format) {
         start(task, format, LoggerFactory.getLogger("Timer"));
     }
 
     public static void start(Runnable task) {
-        start(task, "Task executed in {} ms");
+        start(task, "Task executed in {} ms", LoggerFactory.getLogger("Timer"));
     }
 }

@@ -1,16 +1,15 @@
 package org.maibot.core.net;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.IoEventLoopGroup;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.codec.http.HttpServerCodec;
+import org.maibot.core.cdi.Instance;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.cdi.annotation.AutoInject;
 import org.maibot.core.cdi.annotation.Component;
@@ -29,7 +28,7 @@ public class InnerServer {
     private IoEventLoopGroup workerGroup;
 
     @AutoInject
-    public InnerServer(@Value("${network}") MainConfig.Network conf, TaskExecutorService taskExecutorService) {
+    public InnerServer(@Value("${network}") MainConfig.Network conf, TaskExecutorService taskExecutorService, DispatchHandler dispatchHandler, HttpHandler httpHandler, WsHandler wsHandler) {
         this.bootstrap = new ServerBootstrap();
         bootstrap.channel(NioServerSocketChannel.class)
                 .childHandler(
@@ -39,15 +38,21 @@ public class InnerServer {
                                 ChannelPipeline pipeline = ch.pipeline();
 
                                 // HTTP编解码器 与 HTTP消息聚合器（最大消息长度为5MB）
-                                pipeline.addLast("httpDecoder", new HttpRequestDecoder());
-                                pipeline.addLast("httpEncoder", new HttpResponseEncoder());
+                                pipeline.addLast("httpCodec", new HttpServerCodec());
                                 pipeline.addLast("httpAggregator", new HttpObjectAggregator(1024 * 1024 * 5));
                                 // 分发器
-                                pipeline.addLast("dispatcher", new DispatchHandler());
+                                pipeline.addLast("dispatcher", dispatchHandler);
                                 // HTTP处理器 TODO: 支持HTTPS
-                                pipeline.addLast("httpHandler", new HttpHandler());
+                                pipeline.addLast("httpHandler", httpHandler);
                                 // WS处理器 TODO: 支持WSS
-                                // pipeline.addLast("wsHandler", new WsHandler());
+                                pipeline.addLast("wsHandler", wsHandler);
+                                pipeline.addLast("ExceptionHandler", new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                                        log.error("处理请求时发生异常: {}", cause.getMessage());
+                                        ctx.close();
+                                    }
+                                });
                             }
                         }
                 )

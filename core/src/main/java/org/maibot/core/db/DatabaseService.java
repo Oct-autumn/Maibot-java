@@ -10,12 +10,15 @@ import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.db.dao.DatabaseVersion;
 import org.maibot.core.util.ClassScanner;
+import org.maibot.core.util.TaskExecutorService;
 import org.semver4j.Semver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Component
@@ -23,10 +26,13 @@ public class DatabaseService {
     private static final Logger log = LoggerFactory.getLogger(DatabaseService.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
+    private final TaskExecutorService taskExecutorService;
+
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
-    DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf) {
+    DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf, TaskExecutorService taskExecutorService) {
+        this.taskExecutorService = taskExecutorService;
         this.init(conf);
     }
 
@@ -164,5 +170,40 @@ public class DatabaseService {
         } finally {
             em.close();
         }
+    }
+
+    public void exec(
+            Consumer<EntityManager> func
+    ) {
+        if (this.entityManagerFactory == null) {
+            throw new IllegalStateException("DatabaseManager is not initialized. Call init() before using.");
+        }
+
+        var em = this.entityManagerFactory.createEntityManager();
+
+        try {
+            em.getTransaction().begin();
+            func.accept(em);
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            throw new RuntimeException("Database operation failed", e);
+        } finally {
+            em.close();
+        }
+    }
+
+    public <T> CompletableFuture<T> execAsync(
+            Function<EntityManager, T> func
+    ) {
+        return CompletableFuture.supplyAsync(() -> exec(func), this.taskExecutorService.getExecutor());
+    }
+
+    public CompletableFuture<Void> execAsync(
+            Consumer<EntityManager> func
+    ) {
+        return CompletableFuture.runAsync(() -> exec(func), this.taskExecutorService.getExecutor());
     }
 }

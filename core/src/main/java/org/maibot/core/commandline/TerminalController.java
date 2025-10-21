@@ -1,11 +1,11 @@
-package org.maibot.core;
+package org.maibot.core.commandline;
 
 import lombok.Setter;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.impl.LineReaderImpl;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
-import org.maibot.core.cdi.InstanceManager;
+import org.maibot.core.cdi.Instance;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.log.LogConfig;
 import org.slf4j.Logger;
@@ -36,7 +36,7 @@ public class TerminalController {
     }
 
     public void runCommandline() {
-        this.cmd = new CommandLine(new ShellCommand());
+        this.cmd = new CommandLine(new Commands.ShellCommand());
         this.reader = (LineReaderImpl) LineReaderBuilder.builder()
                 .terminal(this.terminal)
                 .completer(new PicocliJLineCompleter(cmd.getCommandSpec()))
@@ -66,22 +66,5 @@ public class TerminalController {
         } catch (IOException e) {
             log.error("关闭终端时发生错误", e);
         }
-    }
-}
-
-@CommandLine.Command(name = "", description = "MaiBot - JAVA Edition Shell",
-        subcommands = {ExitCommand.class})
-class ShellCommand implements Runnable {
-    @Override
-    public void run() {
-    }
-}
-
-@CommandLine.Command(name = "exit", description = "Exit and stop the bot")
-class ExitCommand implements Runnable {
-    @Override
-    public void run() {
-        System.out.println("Exiting...");
-        InstanceManager.getInstance(TerminalController.class).stopCommandline();
     }
 }

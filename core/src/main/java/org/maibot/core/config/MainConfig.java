@@ -41,6 +41,11 @@ public final class MainConfig {
         public Database database = new Database();
     }
 
+    public static final class Chat {
+        @SerializedName("observation_window_size")
+        public int observationWindowSize = 20;
+    }
+
     @SerializedName("log")
     public Log log = new Log();
 

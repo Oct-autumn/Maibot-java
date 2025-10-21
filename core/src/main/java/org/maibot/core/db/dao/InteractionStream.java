@@ -13,12 +13,11 @@ import java.util.List;
 @Setter
 @Table(
         name = "interaction_stream",
-        indexes = {@Index(name = "idx_entity_group", columnList = "entity_id, group_id")}
+        indexes = {@Index(name = "idx_entity_group", columnList = "entity_id, group_id", unique = true)}
 )
 public class InteractionStream {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
     @ManyToOne
     @JoinColumn(name = "entity_id", foreignKey = @ForeignKey(name = "FK_InteractionStream_InteractionEntity"))
@@ -38,4 +37,8 @@ public class InteractionStream {
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
     private String updatedAt;
+
+    public static String idGen(Long id, boolean isPrivate) {
+        return (isPrivate ? "P-" : "G-") + id;
+    }
 }

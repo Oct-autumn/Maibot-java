@@ -1,6 +1,7 @@
 package org.maibot.core.cdi;
 
 
+import org.maibot.core.cdi.annotation.ObjectFactory;
 import org.maibot.core.config.ConfigService;
 import org.maibot.core.cdi.annotation.AutoInject;
 import org.maibot.core.cdi.annotation.Component;
@@ -11,9 +12,10 @@ import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
-public class InstanceManager {
+public class Instance {
+
     private static final Map<Class<?>, Object> singletons = new ConcurrentHashMap<>();
 
     private static final ThreadLocal<Set<Class<?>>> constructionStack = ThreadLocal.withInitial(HashSet::new);
@@ -25,9 +27,9 @@ public class InstanceManager {
      * @return 类的实例
      * @throws RuntimeException 如果实例创建失败或检测到循环依赖
      */
-    public static <T> T getInstance(Class<T> clazz) {
+    public static <T> T get(Class<T> clazz) {
+        var stack = constructionStack.get();
         try {
-            var stack = constructionStack.get();
             if (stack.contains(clazz)) {
                 throw new RuntimeException("Circular dependency detected while creating instance of Class " + clazz.getName());
             }
@@ -35,22 +37,34 @@ public class InstanceManager {
             stack.add(clazz);   // 标记正在构造该类的实例
 
             T instance;
-            if (clazz.isAnnotationPresent(Component.class) && clazz.getAnnotation(Component.class).singleton()) {
+            if ((clazz.isAnnotationPresent(Component.class) && clazz.getAnnotation(Component.class).singleton()) || clazz.isAnnotationPresent(ObjectFactory.class)) {
                 // 对于单例，使用线程安全的方式获取或创建实例
-                instance = clazz.cast(singletons.computeIfAbsent(
-                        clazz,
-                        InstanceManager::createInstance
-                ));
+                // 放入占位符（Future模式），防止CHM的循环更改
+                // 类似于数据库缓存击穿的加锁等待解决方案
+                var future = new CompletableFuture<T>();
+                var prev = singletons.putIfAbsent(clazz, future);
+                if (prev == null) {
+                    // 当前线程负责创建实例
+                    instance = createInstance(clazz);
+                    future.complete(instance); // 完成Future
+                    singletons.put(clazz, instance); // 替换占位符为实际实例
+                } else if (prev instanceof CompletableFuture) {
+                    // 其他线程正在创建实例，等待其完成
+                    instance = ((CompletableFuture<T>) prev).get();
+                } else {
+                    // 实例已存在，直接返回
+                    instance = clazz.cast(prev);
+                }
             } else {
-                // 对于非单例，尝试使用自动注入
+                // 对于非单例，尝试自动注入
                 instance = createInstance(clazz);
             }
-
-            stack.remove(clazz); // 构造完成，移除标记
 
             return instance;
         } catch (Exception e) {
             throw new RuntimeException("Failed to create instance for class: " + clazz.getName(), e);
+        } finally {
+            stack.remove(clazz); // 确保在异常情况下也能移除标记
         }
     }
 
@@ -81,7 +95,7 @@ public class InstanceManager {
             for (Field field : clazz.getDeclaredFields()) {
                 if (field.isAnnotationPresent(AutoInject.class)) {
                     field.setAccessible(true);
-                    Object dependency = getInstance(field.getType());
+                    Object dependency = get(field.getType());
                     field.set(instance, dependency);
                 }
             }
@@ -113,7 +127,7 @@ public class InstanceManager {
                     var value = paramClarifications[idx].getAnnotation(Value.class).value();
                     params[idx] = getValue(value, paramClarifications[idx].getType());
                 } else {
-                    params[idx] = getInstance(paramClarifications[idx].getType());
+                    params[idx] = get(paramClarifications[idx].getType());
                 }
             }
             try {
@@ -145,7 +159,7 @@ public class InstanceManager {
      */
     private static <T> T getValue(String value, Class<T> valueType) {
         try {
-            var confMgr = InstanceManager.getInstance(ConfigService.class);
+            var confMgr = Instance.get(ConfigService.class);
             if (value.startsWith("${") && value.endsWith("}")) {
                 var path = value.substring(2, value.length() - 1);
                 return confMgr.getFromRaw(path, valueType);

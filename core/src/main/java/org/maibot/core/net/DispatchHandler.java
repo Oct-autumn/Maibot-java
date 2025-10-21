@@ -1,11 +1,16 @@
 package org.maibot.core.net;
 
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
+import org.maibot.core.cdi.annotation.Component;
+import org.maibot.sdk.network.DispatchObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Component
+@ChannelHandler.Sharable
 public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
     private static final Logger log = LoggerFactory.getLogger(DispatchHandler.class);
 

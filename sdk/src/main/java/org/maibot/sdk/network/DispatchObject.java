@@ -1,4 +1,4 @@
-package org.maibot.core.net;
+package org.maibot.sdk.network;
 
 import io.netty.handler.codec.http.FullHttpRequest;
 

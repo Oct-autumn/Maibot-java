@@ -49,7 +49,7 @@ public class TaskExecutorService {
     }
 
     /**
-     * 关闭任务执行器
+     * 关闭所有执行器
      */
     public void shutdown() {
         try {

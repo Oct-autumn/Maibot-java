@@ -1,6 +1,7 @@
 package org.maibot.core.config;
 
 import com.google.gson.annotations.SerializedName;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.util.Collections;
@@ -10,48 +11,52 @@ import java.util.List;
 public final class MainConfig {
     public final static class Log {
         public static class FilterSettings {
-            public String level = "INFO";
+            public String level;
 
             @SerializedName("filter_rule")
-            public List<String> filterRule = Collections.emptyList();
+            public List<String> filterRule;
         }
+
 
         public static final class ConsoleLogSettings extends FilterSettings {
         }
 
         public static final class FileLogSettings extends FilterSettings {
-            public String path = "logs";
+            public String path;
         }
 
-        public ConsoleLogSettings console = new ConsoleLogSettings();
-        public FileLogSettings file = new FileLogSettings();
+        public ConsoleLogSettings console;
+        public FileLogSettings file;
     }
 
     public static final class Network {
-        public String host = "127.0.0.1";
-        public int port = 8000;
+        public String host;
+        public int port;
     }
 
     public static final class LocalData {
         public static class Database {
             @SerializedName("sqlite_path")
-            public String sqlitePath = "data/maibot.db";
+            public String sqlitePath;
         }
 
-        public Database database = new Database();
+        public Database database;
     }
 
     public static final class Chat {
         @SerializedName("observation_window_size")
-        public int observationWindowSize = 20;
+        public int observationWindowSize;
     }
 
     @SerializedName("log")
-    public Log log = new Log();
+    public Log log;
 
     @SerializedName("network")
-    public Network network = new Network();
+    public Network network;
 
     @SerializedName("local_data")
-    public LocalData localData = new LocalData();
+    public LocalData localData;
+
+    @SerializedName("chat")
+    public Chat chat;
 }

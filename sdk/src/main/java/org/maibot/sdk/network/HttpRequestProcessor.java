@@ -37,5 +37,6 @@ public abstract class HttpRequestProcessor {
         return this.uriPath;
     }
 
+    @SuppressWarnings("RedundantThrows") // 抑制警告：声明的异常从不在任何方法实现中抛出
     abstract public HttpResponse handleRequest(FullHttpRequest req) throws Exception;
 }

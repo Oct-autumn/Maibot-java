@@ -39,7 +39,7 @@ public class ThinkingFlow {
             return this.code >= other.code;
         }
     }
-    
+
     private final int OBSERVATION_WINDOW_SIZE;
 
     /// 交互流ID
@@ -51,9 +51,10 @@ public class ThinkingFlow {
     @Getter
     private FlowState state = FlowState.SLEEPING;
     /// 上次活跃时间戳
+    @Getter
     private long lastActiveTimestamp = System.currentTimeMillis();
     /// 交互流观察窗口
-    private Deque<Message> observationWindow = new ArrayDeque<>();
+    private final Deque<Message> observationWindow = new ArrayDeque<>();
 
     protected ThinkingFlow(int max_observation_window_size, String id) {
         this.OBSERVATION_WINDOW_SIZE = max_observation_window_size;
@@ -84,6 +85,7 @@ public class ThinkingFlow {
         while (this.observationWindow.size() > OBSERVATION_WINDOW_SIZE) {
             this.observationWindow.removeFirst();
         }
+        this.lastActiveTimestamp = System.currentTimeMillis();
         if (!this.state.isAtLeast(FlowState.ACTIVE)) {
             this.setState(FlowState.ACTIVE);
         }

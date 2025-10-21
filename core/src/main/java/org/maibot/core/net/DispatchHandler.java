@@ -15,7 +15,7 @@ public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
     private static final Logger log = LoggerFactory.getLogger(DispatchHandler.class);
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof FullHttpRequest request) {
             if (isWebSocketUpgrade(request)) {
                 // WebSocket升级请求

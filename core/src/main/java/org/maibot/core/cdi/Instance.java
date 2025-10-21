@@ -50,7 +50,7 @@ public class Instance {
                     singletons.put(clazz, instance); // 替换占位符为实际实例
                 } else if (prev instanceof CompletableFuture) {
                     // 其他线程正在创建实例，等待其完成
-                    instance = ((CompletableFuture<T>) prev).get();
+                    instance = clazz.cast(((CompletableFuture<?>) prev).get());
                 } else {
                     // 实例已存在，直接返回
                     instance = clazz.cast(prev);

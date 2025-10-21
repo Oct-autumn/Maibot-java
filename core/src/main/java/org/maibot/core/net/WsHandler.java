@@ -11,7 +11,7 @@ import org.maibot.sdk.network.DispatchObject;
 public class WsHandler extends SimpleChannelInboundHandler<DispatchObject.WsDispatchReq> {
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, DispatchObject.WsDispatchReq msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, DispatchObject.WsDispatchReq msg) {
 
     }
 }

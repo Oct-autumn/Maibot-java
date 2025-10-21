@@ -15,6 +15,7 @@ import org.maibot.core.util.TimerProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("ClassCanBeRecord") // 抑制警告：可以转化为记录类
 public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
@@ -37,7 +38,7 @@ public class Main {
         this.thinkingFlowManager = thinkingFlowManager;
     }
 
-    public int run() {
+    public void run() {
         // 启动网络服务
         TimerProxy.start(() -> {
             log.info("正在启动思维流...");
@@ -53,8 +54,6 @@ public class Main {
         // 启动终端
         log.info("正在启动终端...");
         this.terminalController.runCommandline();
-
-        return 0;
     }
 
     public static void main(String[] args) {
@@ -99,7 +98,7 @@ public class Main {
             log.info("↑核心组件预载完成↑");
         }, "预载用时：{}ms");
 
-        var main = Instance.get(Main.class);
-        System.exit(main.run());
+        Instance.get(Main.class).run();
+        System.exit(0);
     }
 }

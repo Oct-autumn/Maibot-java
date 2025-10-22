@@ -5,18 +5,26 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponse;
+import lombok.Getter;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class HttpRequestProcessor {
-    private final HttpMethod method;
-    private final String uriPath;
     protected final Logger log;
+    @Getter
+    private final HttpMethod method;
+    @Getter
+    private final String path;
 
 
-    public HttpRequestProcessor(HttpMethod method, String uriPath, Logger logger) {
+    public HttpRequestProcessor(HttpMethod method, String path, Logger logger) {
         this.method = method;
-        this.uriPath = uriPath;
+        this.path = path;
         this.log = logger;
+    }
+
+    public HttpRequestProcessor(HttpMethod method, String path, Class<?> loggerClass) {
+        this(method, path, LoggerFactory.getLogger(loggerClass));
     }
 
     public void process(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
@@ -27,14 +35,6 @@ public abstract class HttpRequestProcessor {
             log.trace("发送响应 {}", resp.status().code());
             ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
         }
-    }
-
-    public HttpMethod getMethod() {
-        return this.method;
-    }
-
-    public String getUriPath() {
-        return this.uriPath;
     }
 
     @SuppressWarnings("RedundantThrows") // 抑制警告：声明的异常从不在任何方法实现中抛出

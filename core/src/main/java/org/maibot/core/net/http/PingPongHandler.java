@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 public class PingPongHandler extends HttpRequestProcessor {
     public PingPongHandler() {
-        super(HttpMethod.GET, "/ping", LoggerFactory.getLogger(PingPongHandler.class));
+        super(HttpMethod.GET, "/ping", PingPongHandler.class);
     }
 
     public HttpResponse handleRequest(FullHttpRequest req) {

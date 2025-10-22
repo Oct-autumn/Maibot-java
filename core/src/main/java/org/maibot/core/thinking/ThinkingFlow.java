@@ -91,7 +91,6 @@ public class ThinkingFlow {
         }
     }
 
-
     /**
      * 流观察器
      */

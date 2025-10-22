@@ -19,7 +19,7 @@ public class TaskExecutorService {
     private static final Logger log = LoggerFactory.getLogger(TaskExecutorService.class);
 
     @Getter
-    private final ExecutorService executor;
+    private final ThreadPoolExecutor executor;
     @Getter
     private final ExecutorService virtualExecutor;
 
@@ -38,6 +38,7 @@ public class TaskExecutorService {
                     public Thread newThread(@NonNull Runnable r) {
                         Thread thread = new Thread(r);
                         thread.setName("T-" + threadNumber.getAndIncrement());
+                        thread.setUncaughtExceptionHandler((t, e) -> log.error("An uncaught exception occurred in thread {}", t.getName(), e));
                         return thread;
                     }
                 }
@@ -57,10 +58,14 @@ public class TaskExecutorService {
                             }
                         });
                         thread.setName("VT-" + threadId);
+                        thread.setUncaughtExceptionHandler((t, e) -> log.error("An uncaught exception occurred in virtual thread {}", t.getName(), e));
                         return thread;
                     }
                 }
         );
+
+        // 预创建线程池中的核心线程
+        this.executor.prestartAllCoreThreads();
     }
 
     /**
@@ -73,10 +78,19 @@ public class TaskExecutorService {
     @SuppressWarnings("UnusedReturnValue")
     // 不是所有任务的结果都会被使用，但有时需要通过Future来监控任务状态
     public Future<?> submit(Runnable task, boolean virT) {
+        Runnable wrapped = () -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                log.error("An uncaught exception occurred while executing a task", e);
+                throw e;
+            }
+        };
+
         if (virT) {
-            return this.virtualExecutor.submit(task);
+            return this.virtualExecutor.submit(wrapped);
         } else {
-            return this.executor.submit(task);
+            return this.executor.submit(wrapped);
         }
     }
 

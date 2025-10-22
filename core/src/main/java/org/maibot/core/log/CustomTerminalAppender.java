@@ -4,16 +4,20 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import lombok.Setter;
 import org.jline.reader.LineReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.StringJoiner;
+import java.util.stream.Stream;
 
 public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private static final String LOG_TEMPLATE = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ - @{{3} {6}}@ {7}\n{8}";
+    private static final String MDC_TEMPLATE = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
+    private static final String THROWABLE_TEMPLATE = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
 
     @Setter
     private LineReader lineReader;
@@ -28,17 +32,84 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
             default -> "FG_DEFAULT";
         };
 
-        var template = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ - @{{3} {6}}@\n";
-
         return AnsiFormatter.render(
-                template,
+                LOG_TEMPLATE,
                 DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
                 event.getThreadName(),
                 levelColor,
                 String.format("%-5s", event.getLevel()),
                 compressLoggerName(event.getLoggerName(), 30),
-                event.getFormattedMessage()
+                event.getFormattedMessage(),
+                renderMDC(event),
+                renderThrowable(event)
         );
+    }
+
+    /**
+     * 渲染MDC信息
+     *
+     * @param event 日志事件
+     * @return 渲染后的MDC信息字符串
+     */
+    private String renderMDC(ILoggingEvent event) {
+        if (event.getMDCPropertyMap().isEmpty()) {
+            return "";
+        }
+
+        Stream<String> mdcEntries = event.getMDCPropertyMap().entrySet().stream()
+                .map(entry -> AnsiFormatter.render(
+                        MDC_TEMPLATE,
+                        entry.getKey(),
+                        entry.getValue()
+                ));
+
+        StringJoiner mdcBuilder = new StringJoiner(", ", "[", "]");
+        mdcEntries.forEach(mdcBuilder::add);
+
+        return mdcBuilder.toString();
+    }
+
+    /**
+     * 渲染异常信息
+     *
+     * @param event 日志事件
+     * @return 渲染后的异常信息字符串
+     */
+    private String renderThrowable(ILoggingEvent event) {
+        if (event.getThrowableProxy() == null) {
+            return "";
+        }
+
+        var throwableBuilder = new StringBuilder();
+
+        var throwableProxy = event.getThrowableProxy();
+        while (throwableProxy != null) {
+            var firstLineBuilder = new StringBuilder();
+            firstLineBuilder.append("Exception in thread")
+                    .append(" \"").append(event.getThreadName()).append("\" ")
+                    .append(throwableProxy.getClassName());
+            if (throwableProxy.getMessage() != null) {
+                firstLineBuilder.append(": ").append(throwableProxy.getMessage());
+            }
+
+            var stackTraceBuilder = new StringBuilder();
+            var stackTraceElements = throwableProxy.getStackTraceElementProxyArray();
+            for (var element : stackTraceElements) {
+                stackTraceBuilder.append("    ")
+                        .append(element.getSTEAsString())
+                        .append("\n");
+            }
+
+            throwableBuilder.append(AnsiFormatter.render(
+                    THROWABLE_TEMPLATE,
+                    firstLineBuilder.toString(),
+                    stackTraceBuilder.toString()
+            ));
+
+            throwableProxy = throwableProxy.getCause();
+        }
+
+        return throwableBuilder.toString();
     }
 
     /**

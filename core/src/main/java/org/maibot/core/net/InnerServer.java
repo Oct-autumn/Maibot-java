@@ -13,6 +13,7 @@ import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.util.TaskExecutorService;
 import org.slf4j.Logger;
+import org.slf4j.MDC;
 
 @Component
 public class InnerServer {
@@ -33,6 +34,8 @@ public class InnerServer {
                             @Override
                             protected void initChannel(SocketChannel ch) {
                                 ChannelPipeline pipeline = ch.pipeline();
+
+                                MDC.put("connId", Integer.toHexString(System.identityHashCode(ch)));
 
                                 // HTTP编解码器 与 HTTP消息聚合器（最大消息长度为5MB）
                                 pipeline.addLast("httpCodec", new HttpServerCodec());

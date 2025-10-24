@@ -123,6 +123,7 @@ public class ThinkingFlowManager {
      */
     public ThinkingFlow getOrCreateInteractionFlow(String streamId) {
         return thinkingFlows.computeIfAbsent(streamId, k -> {
+            assert streamId.matches("^([PG])-\\d+$");
             String[] parts = streamId.split("-");
 
             // 持久化

@@ -105,7 +105,7 @@ public class ThinkingFlow {
 
         /// 交互流处于激活状态下的观察间隔
         @Setter
-        private int activeObservationIntervalSec = 20;
+        private int activeObservationIntervalSec = 15;
         /// 交互流处于专注状态下的观察间隔
         @Setter
         private int focusedObservationIntervalSec = 5;
@@ -114,22 +114,30 @@ public class ThinkingFlow {
             this.thinkingFlow = flow;
         }
 
+        /**
+         * 交互流状态变更回调
+         *
+         * @param newState 新的交互流状态
+         */
         public void onStateChange(FlowState newState) {
+            // 如果新的状态是激活或更高，发出信号以唤醒观察线程
             if (newState.isAtLeast(FlowState.ACTIVE)) {
-                this.signal();
+                this.signalObserver();
             }
         }
 
+        /**
+         * 停止观察
+         */
         public void stop() {
             running = false;
-            this.signal();
+            this.signalObserver();
         }
 
-        private void signal() {
+        private void signalObserver() {
             lock.lock();
             try {
                 activityCondition.signal();
-                notify();
             } finally {
                 lock.unlock();
             }
@@ -142,6 +150,7 @@ public class ThinkingFlow {
                 try {
                     lock.lock();
                     while (thinkingFlow.getState() == FlowState.SLEEPING && running) {
+                        log.debug("ThinkingFlow {} is sleeping, waiting for activation...", thinkingFlow.id);
                         activityCondition.await();
                     }
                     if (!running) break;
@@ -159,8 +168,8 @@ public class ThinkingFlow {
                     lock.lock();
                     var flowState = thinkingFlow.getState();
                     switch (flowState) {
-                        case ACTIVE -> wait(activeObservationIntervalSec * 1000L);
-                        case FOCUSED -> wait(focusedObservationIntervalSec * 1000L);
+                        case ACTIVE -> activityCondition.await(activeObservationIntervalSec, TimeUnit.SECONDS);
+                        case FOCUSED -> activityCondition.await(focusedObservationIntervalSec, TimeUnit.SECONDS);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

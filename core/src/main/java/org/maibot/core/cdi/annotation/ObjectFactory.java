@@ -7,7 +7,5 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface Component {
-    /// 是否为单例组件，默认为true
-    boolean singleton() default true;
+public @interface ObjectFactory {
 }

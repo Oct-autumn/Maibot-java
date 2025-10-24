@@ -3,23 +3,22 @@ package org.maibot.core.db;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
 import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.maibot.core.config.MainConfig;
-import org.maibot.core.db.dao.DatabaseVersion;
 import org.maibot.core.cdi.annotation.AutoInject;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.cdi.annotation.Value;
+import org.maibot.core.config.MainConfig;
+import org.maibot.core.db.dao.DatabaseVersion;
+import org.maibot.core.util.ClassScanner;
+import org.maibot.core.util.TaskExecutorService;
 import org.semver4j.Semver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.URL;
-import java.util.*;
-import java.util.function.BiFunction;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Component
@@ -27,45 +26,14 @@ public class DatabaseService {
     private static final Logger log = LoggerFactory.getLogger(DatabaseService.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
+    private final TaskExecutorService taskExecutorService;
+
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
-    DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf) {
+    DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf, TaskExecutorService taskExecutorService) {
+        this.taskExecutorService = taskExecutorService;
         this.init(conf);
-    }
-
-    /**
-     * 自动扫描实体类
-     *
-     * @return 实体类列表
-     */
-    private static List<Class<?>> scanEntityClasses(String packageName) {
-        // 通过Reflect自动扫描指定包下被@Entity注解的类
-        Enumeration<URL> dirs;
-        try {
-            dirs = Thread.currentThread().getContextClassLoader().getResources(packageName.replace(".", "/"));
-            while (dirs.hasMoreElements()) {
-                var url = dirs.nextElement();
-                var dir = new File(url.getFile());
-                if (dir.isDirectory()) {
-                    var classes = new java.util.ArrayList<Class<?>>();
-                    for (var file : Objects.requireNonNull(dir.listFiles())) {
-                        if (file.getName().endsWith(".class")) {
-                            var className = packageName + '.' + file.getName().substring(0, file.getName().length() - 6);
-                            var clazz = Class.forName(className);
-                            if (clazz.isAnnotationPresent(jakarta.persistence.Entity.class)) {
-                                classes.add(clazz);
-                                log.debug("Found entity class: {}", className);
-                            }
-                        }
-                    }
-                    return classes;
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to scan entity classes in package: " + packageName, e);
-        }
-        return List.of();
     }
 
     private static PersistenceConfiguration getDbConfiguration(MainConfig.LocalData.Database conf) {
@@ -75,6 +43,7 @@ public class DatabaseService {
         cfg.property("hibernate.connection.driver_class", "org.sqlite.JDBC");
         cfg.property("hibernate.connection.url", "jdbc:sqlite:" + conf.sqlitePath);
         cfg.property("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
+        cfg.property("hibernate.hbm2ddl.auto", "update");
         cfg.property("hibernate.c3p0.min_size", 1);
         cfg.property("hibernate.c3p0.max_size", 1);
         cfg.property("hibernate.c3p0.timeout", 0);
@@ -94,6 +63,7 @@ public class DatabaseService {
     public void init(MainConfig.LocalData.Database conf) {
         try {
             // 检查sqlitePath文件是否存在，不存在则创建
+
             var dbFile = new File(conf.sqlitePath);
             if (!dbFile.exists()) {
                 var parent = dbFile.getParentFile();
@@ -111,12 +81,26 @@ public class DatabaseService {
             var cfg = getDbConfiguration(conf);
 
             // 注册实体类
-            scanEntityClasses("org.maibot.core.db.dao").forEach(clazz -> {
+            Set<Class<?>> entityClasses =
+                    ClassScanner.fileScan(
+                            "org.maibot.core.db.dao",
+                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+                    );
+            entityClasses.addAll(
+                    ClassScanner.jarScan(
+                            Thread.currentThread().getContextClassLoader(),
+                            "org.maibot.core.db.dao",
+                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+                    )
+            );
+
+            entityClasses.forEach(clazz -> {
                 log.debug("Registering entity class: {}", clazz.getName());
                 cfg.managedClass(clazz);
             });
 
             this.entityManagerFactory = new HibernatePersistenceProvider().createEntityManagerFactory(cfg);
+
 
             // 检查数据库版本
             Semver dbVer = getDbVer();
@@ -136,7 +120,11 @@ public class DatabaseService {
      */
     public void close() {
         if (this.entityManagerFactory != null) {
-            this.entityManagerFactory.close();
+            try {
+                this.entityManagerFactory.close();
+            } catch (Exception e) {
+                log.error("关闭数据库服务时发生错误", e);
+            }
             this.entityManagerFactory = null;
         }
     }
@@ -182,5 +170,40 @@ public class DatabaseService {
         } finally {
             em.close();
         }
+    }
+
+    public void exec(
+            Consumer<EntityManager> func
+    ) {
+        if (this.entityManagerFactory == null) {
+            throw new IllegalStateException("DatabaseManager is not initialized. Call init() before using.");
+        }
+
+        var em = this.entityManagerFactory.createEntityManager();
+
+        try {
+            em.getTransaction().begin();
+            func.accept(em);
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            throw new RuntimeException("Database operation failed", e);
+        } finally {
+            em.close();
+        }
+    }
+
+    public <T> CompletableFuture<T> execAsync(
+            Function<EntityManager, T> func
+    ) {
+        return CompletableFuture.supplyAsync(() -> exec(func), this.taskExecutorService.getExecutor());
+    }
+
+    public CompletableFuture<Void> execAsync(
+            Consumer<EntityManager> func
+    ) {
+        return CompletableFuture.runAsync(() -> exec(func), this.taskExecutorService.getExecutor());
     }
 }

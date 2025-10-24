@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Getter
@@ -17,4 +19,12 @@ public class DatabaseVersion {
 
     @Column(nullable = false)
     private String version;
+
+    @Column(name = "created_at", nullable = false)
+    @CreationTimestamp
+    private String createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    @UpdateTimestamp
+    private String updatedAt;
 }

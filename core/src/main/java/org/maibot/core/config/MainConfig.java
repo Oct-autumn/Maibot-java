@@ -1,52 +1,82 @@
 package org.maibot.core.config;
 
 import com.google.gson.annotations.SerializedName;
-import lombok.Data;
+import lombok.AllArgsConstructor;
 
-import java.util.Collections;
 import java.util.List;
 
-@Data
+/*
+ * 主配置类，映射 config.toml 文件结构
+ *
+ * 请在配置项中使用包装类（如 Integer、Boolean）以支持 null 值
+ * 请将字段设为final以防止意外修改
+ */
+
+@SuppressWarnings({"unused", "ClassCanBeRecord"}) // 抑制警告：未使用、可以转化为记录类
+@AllArgsConstructor
 public final class MainConfig {
+    @AllArgsConstructor
     public final static class Log {
+        @AllArgsConstructor
         public static class FilterSettings {
-            public String level = "INFO";
+            public final String level;
 
             @SerializedName("filter_rule")
-            public List<String> filterRule = Collections.emptyList();
+            public final List<String> filterRule;
         }
 
+
         public static final class ConsoleLogSettings extends FilterSettings {
+            public ConsoleLogSettings(String level, List<String> filterRule) {
+                super(level, filterRule);
+            }
         }
 
         public static final class FileLogSettings extends FilterSettings {
-            public String path = "logs";
+            public final String path;
+
+            public FileLogSettings(String level, List<String> filterRule, String path) {
+                super(level, filterRule);
+                this.path = path;
+            }
         }
 
-        public ConsoleLogSettings console = new ConsoleLogSettings();
-        public FileLogSettings file = new FileLogSettings();
+        public final ConsoleLogSettings console;
+        public final FileLogSettings file;
     }
 
+    @AllArgsConstructor
     public static final class Network {
-        public String host = "127.0.0.1";
-        public int port = 8000;
+        public final String host;
+        public final Integer port;
     }
 
+    @AllArgsConstructor
     public static final class LocalData {
+        @AllArgsConstructor
         public static class Database {
             @SerializedName("sqlite_path")
-            public String sqlitePath = "data/maibot.db";
+            public final String sqlitePath;
         }
 
-        public Database database = new Database();
+        public final Database database;
+    }
+
+    @AllArgsConstructor
+    public static final class Thinking {
+        @SerializedName("observation_window_size")
+        public final Integer observationWindowSize;
     }
 
     @SerializedName("log")
-    public Log log = new Log();
+    public final Log log;
 
     @SerializedName("network")
-    public Network network = new Network();
+    public final Network network;
 
     @SerializedName("local_data")
-    public LocalData localData = new LocalData();
+    public final LocalData localData;
+
+    @SerializedName("thinking")
+    public final Thinking thinking;
 }

@@ -1,22 +1,19 @@
 package org.maibot.core.net;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.IoEventLoopGroup;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.codec.http.HttpServerCodec;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.cdi.annotation.AutoInject;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.util.TaskExecutorService;
 import org.slf4j.Logger;
+import org.slf4j.MDC;
 
 @Component
 public class InnerServer {
@@ -29,7 +26,7 @@ public class InnerServer {
     private IoEventLoopGroup workerGroup;
 
     @AutoInject
-    public InnerServer(@Value("${network}") MainConfig.Network conf, TaskExecutorService taskExecutorService) {
+    public InnerServer(@Value("${network}") MainConfig.Network conf, TaskExecutorService taskExecutorService, DispatchHandler dispatchHandler, ExceptionHandler exceptionHandler) {
         this.bootstrap = new ServerBootstrap();
         bootstrap.channel(NioServerSocketChannel.class)
                 .childHandler(
@@ -38,16 +35,15 @@ public class InnerServer {
                             protected void initChannel(SocketChannel ch) {
                                 ChannelPipeline pipeline = ch.pipeline();
 
+                                MDC.put("connId", Integer.toHexString(System.identityHashCode(ch)));
+
                                 // HTTP编解码器 与 HTTP消息聚合器（最大消息长度为5MB）
-                                pipeline.addLast("httpDecoder", new HttpRequestDecoder());
-                                pipeline.addLast("httpEncoder", new HttpResponseEncoder());
+                                pipeline.addLast("httpCodec", new HttpServerCodec());
                                 pipeline.addLast("httpAggregator", new HttpObjectAggregator(1024 * 1024 * 5));
                                 // 分发器
-                                pipeline.addLast("dispatcher", new DispatchHandler());
-                                // HTTP处理器 TODO: 支持HTTPS
-                                pipeline.addLast("httpHandler", new HttpHandler());
-                                // WS处理器 TODO: 支持WSS
-                                // pipeline.addLast("wsHandler", new WsHandler());
+                                pipeline.addLast("dispatcher", dispatchHandler);
+                                // 异常处理兜底
+                                pipeline.addLast("exceptionHandler", exceptionHandler);
                             }
                         }
                 )
@@ -87,7 +83,7 @@ public class InnerServer {
             this.bossGroup.shutdownGracefully().sync();
             this.workerGroup.shutdownGracefully().sync();
         } catch (Exception e) {
-            log.error("网络服务关闭时发生错误", e);
+            log.error("关闭网络服务时发生错误", e);
         }
     }
 }

@@ -3,14 +3,14 @@ package org.maibot.core.util;
 import java.util.HashMap;
 import java.util.Map;
 
-class PrefixTreeMapNode<T, V> {
-    Map<T, PrefixTreeMapNode<T, V>> children = null;
-    boolean isEnd = false;
-    V value = null;
-}
-
 public class PrefixTreeMap<T, V> {
-    PrefixTreeMapNode<T, V> root = new PrefixTreeMapNode<>();
+    static class PrefixTreeMapNode<T, V> {
+        private Map<T, PrefixTreeMapNode<T, V>> children = null;
+        private boolean isEnd = false;
+        private V value = null;
+    }
+
+    private final PrefixTreeMapNode<T, V> root = new PrefixTreeMapNode<>();
 
     /**
      * 插入一个键值对

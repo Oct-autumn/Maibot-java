@@ -1,4 +1,4 @@
-package org.maibot.core.cdi.annotation;
+package org.maibot.core.util;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -6,8 +6,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface Component {
-    /// 是否为单例组件，默认为true
-    boolean singleton() default true;
+@Target(ElementType.FIELD)
+public @interface Nullable {
 }

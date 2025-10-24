@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Core - Local" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="21" />
+    <option name="MAIN_CLASS_NAME" value="org.maibot.core.Main" />
+    <module name="MaiBot-java.main" />
+    <projectPathOnTarget name="projectPathOnTarget" value="{exitCode=0, timeout=false, cancelled=false, stdout=/tmp/tmp.4gqQSYmb4d&#13; , stderr=}/MaiBot-java" />
+    <target name="@@@LOCAL@@@" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/core" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

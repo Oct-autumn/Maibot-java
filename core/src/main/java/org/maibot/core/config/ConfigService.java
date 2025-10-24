@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.moandjiezana.toml.Toml;
 import org.maibot.core.cdi.annotation.Component;
+import org.maibot.core.util.JsonValidator;
 
 import java.io.File;
 import java.io.InputStream;
@@ -55,14 +56,32 @@ public class ConfigService {
         }
         try {
             Toml configToml = new Toml().read(new File(CONFIG_PATH));
-            MainConfig config = configToml.to(MainConfig.class);
+
+            var gson = new Gson();
+
+            var rawJsonMap = gson.toJsonTree(configToml.toMap());
+
+            // 检查是否缺失字段
+            var missingField = JsonValidator.validateJsonAgainstClass(rawJsonMap.getAsJsonObject(), MainConfig.class);
+            if (!missingField.isEmpty()) {
+                throw new RuntimeException("配置文件缺失以下字段: " + String.join(", ", missingField));
+            }
+
+            // 反序列化为 MainConfig 对象
+            MainConfig config = gson.fromJson(rawJsonMap, MainConfig.class);
+
             configRef.set(config);
-            rawConfigRef.set(new Gson().toJsonTree(config, MainConfig.class).getAsJsonObject());
+            rawConfigRef.set(gson.toJsonTree(config, MainConfig.class).getAsJsonObject());
         } catch (Exception e) {
             throw new RuntimeException("Failed to load config file: " + CONFIG_PATH, e);
         }
     }
 
+    /**
+     * 获取配置对象
+     *
+     * @return 配置对象
+     */
     public MainConfig get() {
         if (configRef.get() == null) {
             throw new IllegalStateException("Config not loaded. Please call load() before accessing the config.");
@@ -71,6 +90,14 @@ public class ConfigService {
         return configRef.get();
     }
 
+    /**
+     * 从原始 JSON 配置中获取指定路径的值
+     *
+     * @param path  配置路径，使用点号分隔
+     * @param clazz 目标类型
+     * @param <T>   目标类型
+     * @return 指定路径的配置值
+     */
     public <T> T getFromRaw(String path, Class<T> clazz) {
         if (rawConfigRef.get() == null) {
             throw new IllegalStateException("Config not loaded. Please call load() before accessing the config.");

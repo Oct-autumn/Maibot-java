@@ -13,6 +13,9 @@ public class ModManager {
     private static final Logger log = LoggerFactory.getLogger(ModManager.class);
 
     private static final Map<String, Mod> loadedMods = new ConcurrentHashMap<>();
+    
+    private ModManager() {
+    }
 
     /**
      * 重载Mods

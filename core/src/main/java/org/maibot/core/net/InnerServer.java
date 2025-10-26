@@ -80,8 +80,12 @@ public class InnerServer {
 
     public void shutdown() {
         try {
-            this.bossGroup.shutdownGracefully().sync();
-            this.workerGroup.shutdownGracefully().sync();
+            if (this.bossGroup != null) {
+                this.bossGroup.shutdownGracefully().sync();
+            }
+            if (this.workerGroup != null) {
+                this.workerGroup.shutdownGracefully().sync();
+            }
         } catch (Exception e) {
             log.error("关闭网络服务时发生错误", e);
         }

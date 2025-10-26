@@ -24,6 +24,10 @@ public class TaskExecutorService {
     private final ExecutorService virtualExecutor;
 
     public TaskExecutorService() {
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            log.trace("An uncaught exception occurred in thread {}", t.getName(), e);
+        });
+
         var processorCount = Runtime.getRuntime().availableProcessors();
         this.executor = new ThreadPoolExecutor(
                 processorCount,
@@ -38,7 +42,6 @@ public class TaskExecutorService {
                     public Thread newThread(@NonNull Runnable r) {
                         Thread thread = new Thread(r);
                         thread.setName("T-" + threadNumber.getAndIncrement());
-                        thread.setUncaughtExceptionHandler((t, e) -> log.error("An uncaught exception occurred in thread {}", t.getName(), e));
                         return thread;
                     }
                 }
@@ -58,7 +61,6 @@ public class TaskExecutorService {
                             }
                         });
                         thread.setName("VT-" + threadId);
-                        thread.setUncaughtExceptionHandler((t, e) -> log.error("An uncaught exception occurred in virtual thread {}", t.getName(), e));
                         return thread;
                     }
                 }
@@ -71,27 +73,31 @@ public class TaskExecutorService {
     /**
      * 提交任务到执行器
      *
-     * @param task 任务Func
+     * @param task 任务Callable
+     * @param virT 是否使用虚拟线程
+     * @return 任务Future
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    // 不是所有任务的结果都会被使用，但有时需要通过Future来监控任务状态
+    public <T> Future<T> submit(Callable<T> task, boolean virT) {
+        if (virT) {
+            return this.virtualExecutor.submit(task);
+        } else {
+            return this.executor.submit(task);
+        }
+    }
+
+    /**
+     * 提交任务到执行器
+     *
+     * @param task 任务Runnable
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
     @SuppressWarnings("UnusedReturnValue")
     // 不是所有任务的结果都会被使用，但有时需要通过Future来监控任务状态
     public Future<?> submit(Runnable task, boolean virT) {
-        Runnable wrapped = () -> {
-            try {
-                task.run();
-            } catch (Exception e) {
-                log.error("An uncaught exception occurred while executing a task", e);
-                throw e;
-            }
-        };
-
-        if (virT) {
-            return this.virtualExecutor.submit(wrapped);
-        } else {
-            return this.executor.submit(wrapped);
-        }
+        return this.submit(Executors.callable(task), virT);
     }
 
     /**

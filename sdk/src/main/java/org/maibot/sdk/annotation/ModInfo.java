@@ -8,11 +8,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface ModInfo {
-    String type();
-    String name();
-    String version();
-    String supportedCoreVersion();
     String description() default "";
+
     String author() default "Unknown";
-    String[] dependencies() default {};
 }

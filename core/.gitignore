@@ -40,9 +40,10 @@ bin/
 .DS_Store
 
 ### Build Files ###
-src/main/resources/org/maibot/core/version.properties
+src/main/resources/META-INF/build-inf.properties
 
 ### Running Files ###
 logs/
 data/
+mods/
 config.toml

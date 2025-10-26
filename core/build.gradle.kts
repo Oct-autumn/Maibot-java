@@ -1,4 +1,5 @@
 import java.time.Instant
+import java.security.MessageDigest
 
 plugins {
     id("java")
@@ -6,7 +7,11 @@ plugins {
 }
 
 group = "org.maibot.core"
-description = "MaiBot Core"
+
+// Core Version
+// Update this version when releasing a new Core version
+// Format: MAJOR.MINOR.PATCH-PRERELEASE
+// Do not add build metadata here; it will be appended automatically during the build process
 version = "0.1.0-Alpha"
 
 repositories {
@@ -53,17 +58,23 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Create Version.Properties
-tasks.register("createVersionProperties") {
-    val outputDir = file("src/main/resources/org/maibot/core")
-    val outputFile = file("$outputDir/version.properties")
+// Create build-inf.properties
+tasks.register("createBuildInf") {
+    val outputDir = file("src/main/resources/META-INF")
+    val outputFile = file("$outputDir/build-inf.properties")
+
+    val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
 
     doLast {
         if (!outputDir.exists()) {
             outputDir.mkdirs()
         }
-        outputFile.writeText("version=$version\n")
-        outputFile.appendText("buildTime=${Instant.now().epochSecond}\n")
+        outputFile.writeText(
+            """
+            version=$innerVersion
+            buildTime=${Instant.now().epochSecond}
+        """.trimIndent()
+        )
     }
 }
 
@@ -72,11 +83,29 @@ tasks.named("compileJava") {
 }
 
 tasks.named("processResources") {
-    dependsOn("createVersionProperties")
+    dependsOn("createBuildInf")
 }
 
 tasks.jar {
     manifest {
         attributes["Main-Class"] = "org.maibot.core.Main"
     }
+}
+
+// Calculate source code hash for build identification
+fun calcSrcHash(): String {
+    val srcDir = file("src/main/java")
+    val digest = MessageDigest.getInstance("SHA-256")
+
+    srcDir.walkTopDown().filter { it.isFile }.forEach { file ->
+        file.inputStream().use { fis ->
+            val buffer = ByteArray(1024)
+            var bytesRead: Int
+            while (fis.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+    }
+
+    return digest.digest().joinToString("") { "%02x".format(it) }
 }

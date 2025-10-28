@@ -12,9 +12,9 @@ import java.util.List;
 @Getter
 @Setter
 @Table(
-        name = "interaction_group",
-        uniqueConstraints = {@UniqueConstraint(columnNames = {"platformId", "platformGroupId"})},
-        indexes = {@Index(name = "idx_platform_group", columnList = "platformId, platformGroupId")}
+  name = "interaction_group",
+  uniqueConstraints = {@UniqueConstraint(columnNames = {"platformId", "platformGroupId"})},
+  indexes = {@Index(name = "idx_platform_group", columnList = "platformId, platformGroupId")}
 )
 public class InteractionGroup {
     @Id

@@ -8,6 +8,10 @@ public class IgnorableException extends RuntimeException {
         super(message);
     }
 
+    public IgnorableException(Throwable cause) {
+        super(cause);
+    }
+
     public IgnorableException(String format, Object... args) {
         super(String.format(format, args));
 

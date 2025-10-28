@@ -10,10 +10,20 @@ import org.jline.reader.LineReader;
 import org.maibot.core.config.MainConfig;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class LogConfig {
-    private static final Set<String> AVAL_LEVELS = new HashSet<>(Arrays.asList("TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF"));
+    private static final Set<String> AVAL_LEVELS = new HashSet<>(Arrays.asList(
+      "TRACE",
+      "DEBUG",
+      "INFO",
+      "WARN",
+      "ERROR",
+      "OFF"
+    ));
 
     public static void configure(MainConfig.Log conf) {
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
@@ -33,7 +43,10 @@ public class LogConfig {
         }
     }
 
-    public static CustomTerminalAppender getTerminalAppender(LoggerContext context, MainConfig.Log.ConsoleLogSettings conf) {
+    public static CustomTerminalAppender getTerminalAppender(
+      LoggerContext context,
+      MainConfig.Log.ConsoleLogSettings conf
+    ) {
         var terminalAppender = new CustomTerminalAppender();
         terminalAppender.setName("terminal");
         terminalAppender.setContext(context);
@@ -46,7 +59,10 @@ public class LogConfig {
         return terminalAppender;
     }
 
-    private static FileAppender<ILoggingEvent> getFileAppender(LoggerContext context, MainConfig.Log.FileLogSettings conf) {
+    private static FileAppender<ILoggingEvent> getFileAppender(
+      LoggerContext context,
+      MainConfig.Log.FileLogSettings conf
+    ) {
         FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
         fileAppender.setName("file");
         fileAppender.setContext(context);
@@ -56,10 +72,10 @@ public class LogConfig {
             PatternLayoutEncoder fileEncoder = new PatternLayoutEncoder();
             fileEncoder.setContext(context);
             fileEncoder.setPattern("%d{yyyy-MM-dd HH:mm:ss} [%thread] " +
-                    "%-5level " +
-                    "%logger - " +
-                    "%msg" +
-                    "%n");
+                                     "%-5level " +
+                                     "%logger - " +
+                                     "%msg" +
+                                     "%n");
             fileEncoder.start();
             fileAppender.setEncoder(fileEncoder);
         }

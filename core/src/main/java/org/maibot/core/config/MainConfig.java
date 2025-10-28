@@ -42,12 +42,12 @@ public final class MainConfig {
         }
 
         public final ConsoleLogSettings console;
-        public final FileLogSettings file;
+        public final FileLogSettings    file;
     }
 
     @AllArgsConstructor
     public static final class Network {
-        public final String host;
+        public final String  host;
         public final Integer port;
     }
 

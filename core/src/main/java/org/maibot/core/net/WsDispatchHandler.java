@@ -50,7 +50,9 @@ public class WsDispatchHandler extends SimpleChannelInboundHandler<FullHttpReque
             activeWsManager.addConnection(path, ctx);
 
             for (var handler : processors.get(path).getHandlers()) {
-                String uniqueHandlerName = handler.getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(handler));
+                String uniqueHandlerName = handler.getClass()
+                                                  .getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(
+                  handler));
                 ctx.pipeline().addBefore("exceptionHandler", uniqueHandlerName, handler);
             }
 
@@ -60,8 +62,8 @@ public class WsDispatchHandler extends SimpleChannelInboundHandler<FullHttpReque
         } else {
             log.warn("未找到 PATH: {} 的WS处理器，返回404", path);
             var resp = new DefaultHttpResponse(
-                    req.protocolVersion(),
-                    HttpResponseStatus.NOT_FOUND
+              req.protocolVersion(),
+              HttpResponseStatus.NOT_FOUND
             );
 
             ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);

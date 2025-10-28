@@ -2,8 +2,10 @@ package org.maibot.core.config;
 
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.sdk.SdkVersion;
+import org.maibot.sdk.exceptions.FatalError;
 import org.semver4j.Semver;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -12,8 +14,8 @@ import java.util.Properties;
 
 @Component
 public class BuildInfo {
-    private final Semver coreVersion;
-    private final Semver sdkVersion;
+    private final Semver  coreVersion;
+    private final Semver  sdkVersion;
     private final Instant buildTime;
 
     private BuildInfo() {
@@ -30,8 +32,8 @@ public class BuildInfo {
             this.coreVersion = new Semver(versionStr);
             this.sdkVersion = new Semver(sdkVersionStr);
             this.buildTime = Instant.ofEpochSecond(Long.parseLong(buildTimeStr));
-        } catch (Exception e) {
-            throw new RuntimeException("An error occurred when loading build info.", e);
+        } catch (IOException e) {
+            throw new FatalError("An error occurred when loading build info.", e);
         }
     }
 

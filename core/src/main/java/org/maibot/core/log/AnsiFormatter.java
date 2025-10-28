@@ -9,9 +9,9 @@ import java.util.regex.Pattern;
 
 public class AnsiFormatter {
     private static final Pattern FORMAT_BLOCK_PATTERN =
-            Pattern.compile("@\\{(?<codes>[^ ]+) (?<text>.*?)}@");
-    private static final Pattern PLACEHOLDER_PATTERN =
-            Pattern.compile("\\{(?<idx>\\d*)}");
+      Pattern.compile("@\\{(?<codes>[^ ]+) (?<text>.*?)}@");
+    private static final Pattern PLACEHOLDER_PATTERN  =
+      Pattern.compile("\\{(?<idx>\\d*)}");
 
     public static final String HEX_PREFIX = "#";
 
@@ -50,8 +50,8 @@ public class AnsiFormatter {
 
             // 递归处理内部占位符稍后统一做，这里只做样式
             List<String> codes = Arrays.stream(codesRaw.split(","))
-                    .map(String::trim)
-                    .toList();
+                                       .map(String::trim)
+                                       .toList();
             Ansi ansi = Ansi.ansi();
             for (String code : codes) {
                 var matcher = PLACEHOLDER_PATTERN.matcher(code);
@@ -113,7 +113,7 @@ public class AnsiFormatter {
                 useIndex = thisIsIndex;
             } else if (useIndex != thisIsIndex) {
                 throw new IllegalArgumentException(
-                        "Mixed use of indexed and sequential placeholders is not allowed.");
+                  "Mixed use of indexed and sequential placeholders is not allowed.");
             }
 
             int idx;
@@ -198,7 +198,7 @@ public class AnsiFormatter {
             case "STRIKETHROUGH_OFF" -> ansi.a(Ansi.Attribute.STRIKETHROUGH_OFF);
             default -> {
                 if (code.matches(HEX_PREFIX + "[0-9a-fA-F]{6}")
-                        || code.matches("FG" + HEX_PREFIX + "[0-9a-fA-F]{6}")) {
+                  || code.matches("FG" + HEX_PREFIX + "[0-9a-fA-F]{6}")) {
                     // 24-bit color
                     int r = Integer.parseInt(code.substring(1, 3), 16);
                     int g = Integer.parseInt(code.substring(3, 5), 16);

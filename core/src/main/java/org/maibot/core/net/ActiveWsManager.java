@@ -24,14 +24,16 @@ public class ActiveWsManager {
      * @param ctx  连接的ChannelHandlerContext
      */
     public void addConnection(String path, ChannelHandlerContext ctx) {
-        var v = activeConnections.computeIfAbsent(path, k -> {
-            log.debug("PATH: {} 添加新的活动WebSocket连接", path);
-            ctx.channel().closeFuture().addListener(future -> {
-                activeConnections.remove(path);
-                log.debug("PATH: {} 的WebSocket连接已关闭，移除活动连接", path);
-            });
-            return ctx;
-        });
+        var v = activeConnections.computeIfAbsent(
+          path, k -> {
+              log.debug("PATH: {} 添加新的活动WebSocket连接", path);
+              ctx.channel().closeFuture().addListener(future -> {
+                  activeConnections.remove(path);
+                  log.debug("PATH: {} 的WebSocket连接已关闭，移除活动连接", path);
+              });
+              return ctx;
+          }
+        );
 
         if (v != ctx) {
             // 已有相同路径的连接存在，关闭新的连接请求

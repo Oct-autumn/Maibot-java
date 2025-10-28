@@ -5,7 +5,6 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.impl.LineReaderImpl;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
-import org.maibot.core.cdi.Instance;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.log.LogConfig;
 import org.slf4j.Logger;
@@ -21,14 +20,15 @@ public class TerminalController {
 
     private final Terminal terminal;
 
-    private boolean running;
-    private CommandLine cmd;
+    private boolean        running;
+    private CommandLine    cmd;
     private LineReaderImpl reader;
 
     @Setter
     private String prompt;
 
-    private TerminalController() throws Exception {
+    private TerminalController()
+    throws Exception {
         this.terminal = TerminalBuilder.builder().system(true).build();
         this.running = false;
 
@@ -38,9 +38,9 @@ public class TerminalController {
     public void runCommandline() {
         this.cmd = new CommandLine(new Commands.ShellCommand());
         this.reader = (LineReaderImpl) LineReaderBuilder.builder()
-                .terminal(this.terminal)
-                .completer(new PicocliJLineCompleter(cmd.getCommandSpec()))
-                .build();
+                                                        .terminal(this.terminal)
+                                                        .completer(new PicocliJLineCompleter(cmd.getCommandSpec()))
+                                                        .build();
         this.running = true;
         LogConfig.setTerminalLineReader(this.reader);
         while (this.running) {

@@ -8,9 +8,9 @@ import java.util.List;
 public class ModMeta {
     public static class ModDependency {
         @SerializedName("mod_id")
-        public final String modId;
+        public final String  modId;
         @SerializedName("version")
-        public final String version;
+        public final String  version;
         @SerializedName("mandatory")
         public final boolean mandatory;
 
@@ -32,7 +32,13 @@ public class ModMeta {
 
     public final List<ModDependency> dependencies;
 
-    public ModMeta(String modId, String version, String mainClass, String sdkVersion, List<ModDependency> dependencies) {
+    public ModMeta(
+      String modId,
+      String version,
+      String mainClass,
+      String sdkVersion,
+      List<ModDependency> dependencies
+    ) {
         this.modId = modId;
         this.version = version;
         this.mainClass = mainClass;

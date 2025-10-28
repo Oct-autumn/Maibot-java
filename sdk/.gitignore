@@ -43,4 +43,4 @@ bin/
 .DS_Store
 
 ### Build Files ###
-src/main/resources/META-INF/build-inf.properties
+src/main/resources/org/maibot/sdk/build-inf.properties

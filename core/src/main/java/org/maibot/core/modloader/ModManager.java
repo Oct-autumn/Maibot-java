@@ -17,15 +17,16 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.*;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
 @Component
 public class ModManager {
-    private static final Logger log = LoggerFactory.getLogger(ModManager.class);
+    private static final Logger log            = LoggerFactory.getLogger(ModManager.class);
     private static final String MODS_DIRECTORY = "mods";
-    private static final String MOD_META_PATH = "META-INF/mod.toml";
+    private static final String MOD_META_PATH  = "META-INF/mod.toml";
 
     private final BuildInfo buildInfo;
 
@@ -89,19 +90,19 @@ public class ModManager {
                 tree.addMod(metaData.modId, metaData.version, metaData.mainClass);
 
                 tree.addDependency(
-                        metaData.modId,
-                        "sdk",
-                        metaData.sdkVersion,
-                        true
+                  metaData.modId,
+                  "sdk",
+                  metaData.sdkVersion,
+                  true
                 );
 
                 if (metaData.dependencies != null) {
                     for (var dep : metaData.dependencies) {
                         tree.addDependency(
-                                metaData.modId,
-                                dep.modId,
-                                dep.version,
-                                dep.mandatory
+                          metaData.modId,
+                          dep.modId,
+                          dep.version,
+                          dep.mandatory
                         );
                     }
                 }
@@ -164,7 +165,8 @@ public class ModManager {
      * @return Mod元数据对象
      * @throws UnignorableException 如果读取或解析失败
      */
-    private static ModMeta readModMeta(JarFile modJar) throws UnignorableException {
+    private static ModMeta readModMeta(JarFile modJar)
+    throws UnignorableException {
         try (InputStream is = modJar.getInputStream(modJar.getJarEntry(MOD_META_PATH))) {
             if (is == null) {
                 throw new UnignorableException("Mod JAR does not contain %s", MOD_META_PATH);
@@ -175,7 +177,7 @@ public class ModManager {
             // 考虑到Mod开发时构建脚本中提供了完善的校验，这里不再进行冗余的字段检查
 
             return metaToml.to(ModMeta.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new UnignorableException("Failed to read mod metadata from %s", modJar.getName(), e);
         }
     }

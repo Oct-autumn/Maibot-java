@@ -3,6 +3,7 @@ package org.maibot.core.util;
 import lombok.Getter;
 import lombok.NonNull;
 import org.maibot.core.cdi.annotation.Component;
+import org.maibot.sdk.exceptions.FatalError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,49 +22,50 @@ public class TaskExecutorService {
     @Getter
     private final ThreadPoolExecutor executor;
     @Getter
-    private final ExecutorService virtualExecutor;
+    private final ExecutorService    virtualExecutor;
 
     public TaskExecutorService() {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
-            log.trace("An uncaught exception occurred in thread {}", t.getName(), e);
+            log.error("An uncaught exception occurred in thread {}", t.getName(), e);
+            System.exit(1);
         });
 
         var processorCount = Runtime.getRuntime().availableProcessors();
         this.executor = new ThreadPoolExecutor(
-                processorCount,
-                processorCount * 2,
-                60L,
-                java.util.concurrent.TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(),
-                new ThreadFactory() {
-                    final AtomicInteger threadNumber = new AtomicInteger(1);
+          processorCount,
+          processorCount * 2,
+          60L,
+          java.util.concurrent.TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(),
+          new ThreadFactory() {
+              final AtomicInteger threadNumber = new AtomicInteger(1);
 
-                    @Override
-                    public Thread newThread(@NonNull Runnable r) {
-                        Thread thread = new Thread(r);
-                        thread.setName("T-" + threadNumber.getAndIncrement());
-                        return thread;
-                    }
-                }
+              @Override
+              public Thread newThread(@NonNull Runnable r) {
+                  Thread thread = new Thread(r);
+                  thread.setName("T-" + threadNumber.getAndIncrement());
+                  return thread;
+              }
+          }
         );
         this.virtualExecutor = Executors.newThreadPerTaskExecutor(
-                new ThreadFactory() {
-                    final AtomicInteger threadNumber = new AtomicInteger(1);
+          new ThreadFactory() {
+              final AtomicInteger threadNumber = new AtomicInteger(1);
 
-                    @Override
-                    public Thread newThread(@NonNull Runnable r) {
-                        Thread thread = Thread.ofVirtual().unstarted(r);
-                        var threadId = threadNumber.getAndUpdate(idx -> {
-                            if (idx >= 100) {
-                                return 1;
-                            } else {
-                                return idx + 1;
-                            }
-                        });
-                        thread.setName("VT-" + threadId);
-                        return thread;
-                    }
-                }
+              @Override
+              public Thread newThread(@NonNull Runnable r) {
+                  Thread thread = Thread.ofVirtual().unstarted(r);
+                  var threadId = threadNumber.getAndUpdate(idx -> {
+                      if (idx >= 100) {
+                          return 1;
+                      } else {
+                          return idx + 1;
+                      }
+                  });
+                  thread.setName("VT-" + threadId);
+                  return thread;
+              }
+          }
         );
 
         // 预创建线程池中的核心线程
@@ -77,14 +79,32 @@ public class TaskExecutorService {
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
-    @SuppressWarnings("UnusedReturnValue")
-    // 不是所有任务的结果都会被使用，但有时需要通过Future来监控任务状态
-    public <T> Future<T> submit(Callable<T> task, boolean virT) {
+    public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT) {
+        var future = new CompletableFuture<T>();
+
+        var wrappedTask = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    var ret = task.call();
+                    future.complete(ret);
+                } catch (FatalError e) {
+                    log.error("线程发生致命错误，终止运行", e);
+                    System.exit(1);
+                    throw e; // 这一行实际上不会被执行，但编译器需要
+                } catch (Throwable e) {
+                    future.completeExceptionally(e);
+                }
+            }
+        };
+
         if (virT) {
-            return this.virtualExecutor.submit(task);
+            this.virtualExecutor.execute(wrappedTask);
         } else {
-            return this.executor.submit(task);
+            this.executor.execute(wrappedTask);
         }
+
+        return future;
     }
 
     /**
@@ -94,11 +114,34 @@ public class TaskExecutorService {
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
-    @SuppressWarnings("UnusedReturnValue")
-    // 不是所有任务的结果都会被使用，但有时需要通过Future来监控任务状态
-    public Future<?> submit(Runnable task, boolean virT) {
-        return this.submit(Executors.callable(task), virT);
+    public CompletableFuture<Object> submit(Runnable task, boolean virT) {
+        var future = new CompletableFuture<>();
+
+        var wrappedTask = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    task.run();
+                    future.complete(null);
+                } catch (FatalError e) {
+                    log.error("线程发生致命错误，终止运行", e);
+                    System.exit(1);
+                    throw e; // 这一行实际上不会被执行，但编译器需要
+                } catch (Throwable e) {
+                    future.completeExceptionally(e);
+                }
+            }
+        };
+
+        if (virT) {
+            this.virtualExecutor.execute(wrappedTask);
+        } else {
+            this.executor.execute(wrappedTask);
+        }
+
+        return future;
     }
+
 
     /**
      * 关闭所有执行器

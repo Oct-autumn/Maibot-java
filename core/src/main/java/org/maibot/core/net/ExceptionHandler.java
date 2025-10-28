@@ -14,7 +14,7 @@ public class ExceptionHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.error("处理消息时发生异常", cause);
+        log.warn("处理消息时发生异常", cause);
         ctx.close();
     }
 }

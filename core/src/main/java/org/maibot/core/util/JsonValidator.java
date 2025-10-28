@@ -6,7 +6,10 @@ import com.google.gson.annotations.SerializedName;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 public class JsonValidator {
     /**
@@ -29,7 +32,12 @@ public class JsonValidator {
      * @param pathPrefix 当前路径前缀
      * @param missing    缺失字段列表
      */
-    private static void recursiveValidation(JsonElement element, Class<?> clazz, String pathPrefix, List<String> missing) {
+    private static void recursiveValidation(
+      JsonElement element,
+      Class<?> clazz,
+      String pathPrefix,
+      List<String> missing
+    ) {
         if (element == null || !element.isJsonObject()) {
             missing.add(pathPrefix.isEmpty() ? clazz.getSimpleName() : pathPrefix);
             return;
@@ -71,8 +79,8 @@ public class JsonValidator {
 
             // 集合/数组/映射等直接跳过深度校验（可按需扩展）
             if (Collection.class.isAssignableFrom(fieldType) ||
-                    Map.class.isAssignableFrom(fieldType) ||
-                    fieldType.isArray()) {
+              Map.class.isAssignableFrom(fieldType) ||
+              fieldType.isArray()) {
                 // 如果需要，可以尝试根据泛型类型对元素进行校验（较复杂，留作扩展）
                 continue;
             }
@@ -90,7 +98,7 @@ public class JsonValidator {
      */
     private static boolean isSimpleType(Class<?> type) {
         return type.isPrimitive()
-                || type == String.class
-                || Number.class.isAssignableFrom(type);
+          || type == String.class
+          || Number.class.isAssignableFrom(type);
     }
 }

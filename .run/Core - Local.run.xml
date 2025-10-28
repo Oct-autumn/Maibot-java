@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Core - Local" type="Application" factoryName="Application">
+  <configuration default="false" name="Core - Local" type="Application" factoryName="Application" singleton="false">
     <option name="ALTERNATIVE_JRE_PATH" value="21" />
     <option name="MAIN_CLASS_NAME" value="org.maibot.core.Main" />
     <module name="MaiBot-java.main" />

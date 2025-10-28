@@ -15,7 +15,7 @@ public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
     private static final Logger log = LoggerFactory.getLogger(DispatchHandler.class);
 
     private final HttpDispatchHandler httpDispatchHandler;
-    private final WsDispatchHandler wsDispatchHandler;
+    private final WsDispatchHandler   wsDispatchHandler;
 
     @AutoInject
     public DispatchHandler(HttpDispatchHandler httpDispatchHandler, WsDispatchHandler wsDispatchHandler) {
@@ -50,7 +50,7 @@ public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
 
     private boolean isWebSocketUpgrade(HttpRequest request) {
         return request.method().equals(HttpMethod.GET)
-                && request.headers().contains(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET, true)
-                && request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true);
+          && request.headers().contains(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET, true)
+          && request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true);
     }
 }

@@ -9,13 +9,19 @@ import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.db.dao.DatabaseVersion;
+import org.maibot.core.exceptions.DbOperationException;
+import org.maibot.core.exceptions.NotInitialized;
 import org.maibot.core.util.ClassScanner;
 import org.maibot.core.util.TaskExecutorService;
+import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.exceptions.UnignorableException;
 import org.semver4j.Semver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -23,7 +29,7 @@ import java.util.function.Function;
 
 @Component
 public class DatabaseService {
-    private static final Logger log = LoggerFactory.getLogger(DatabaseService.class);
+    private static final Logger log         = LoggerFactory.getLogger(DatabaseService.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
     private final TaskExecutorService taskExecutorService;
@@ -31,7 +37,10 @@ public class DatabaseService {
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
-    DatabaseService(@Value("${local_data.database}") MainConfig.LocalData.Database conf, TaskExecutorService taskExecutorService) {
+    DatabaseService(
+      @Value("${local_data.database}") MainConfig.LocalData.Database conf,
+      TaskExecutorService taskExecutorService
+    ) {
         this.taskExecutorService = taskExecutorService;
         this.init(conf);
     }
@@ -61,57 +70,59 @@ public class DatabaseService {
      * @param conf 数据库配置
      */
     public void init(MainConfig.LocalData.Database conf) {
+        // 检查sqlitePath文件是否存在，不存在则创建
+
+        var dbFile = new File(conf.sqlitePath);
+        if (!dbFile.exists()) {
+            var parent = dbFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                if (!parent.mkdirs()) {
+                    throw new FatalError("Failed to create directories for database file: %s", conf.sqlitePath);
+                }
+            }
+            try {
+                var res = dbFile.createNewFile();
+            } catch (IOException e) {
+                throw new FatalError("Failed to create database file: %s", conf.sqlitePath, e);
+            }
+        }
+
+        // 获取配置
+        var cfg = getDbConfiguration(conf);
+
+        // 注册实体类
+        Set<Class<?>> entityClasses = new HashSet<>();
         try {
-            // 检查sqlitePath文件是否存在，不存在则创建
+            entityClasses.addAll(ClassScanner.fileScan(
+              "org.maibot.core.db.dao",
+              clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+            ));
+            entityClasses.addAll(ClassScanner.jarScan(
+              Thread.currentThread().getContextClassLoader(),
+              "org.maibot.core.db.dao",
+              clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
+            ));
+        } catch (UnignorableException e) {
+            log.warn("在搜索数据库实体类时发生异常");
+            throw new FatalError("Failed to search database entity class.", e);
+        }
 
-            var dbFile = new File(conf.sqlitePath);
-            if (!dbFile.exists()) {
-                var parent = dbFile.getParentFile();
-                if (parent != null && !parent.exists()) {
-                    if (!parent.mkdirs()) {
-                        throw new RuntimeException("Failed to create directories for database file: " + conf.sqlitePath);
-                    }
-                }
-                if (!dbFile.createNewFile()) {
-                    throw new RuntimeException("Failed to create database file: " + conf.sqlitePath);
-                }
-            }
+        entityClasses.forEach(clazz -> {
+            log.debug("Registering entity class: {}", clazz.getName());
+            cfg.managedClass(clazz);
+        });
 
-            // 获取配置
-            var cfg = getDbConfiguration(conf);
+        this.entityManagerFactory = new HibernatePersistenceProvider().createEntityManagerFactory(cfg);
 
-            // 注册实体类
-            Set<Class<?>> entityClasses =
-                    ClassScanner.fileScan(
-                            "org.maibot.core.db.dao",
-                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
-                    );
-            entityClasses.addAll(
-                    ClassScanner.jarScan(
-                            Thread.currentThread().getContextClassLoader(),
-                            "org.maibot.core.db.dao",
-                            clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
-                    )
+        // 检查数据库版本
+        Semver dbVer = getDbVer();
+        if (!dbVer.isApiCompatible(SUPPORT_VER)) {
+            log.warn("数据库版本与应用程序不兼容。需要: {}, 现有: {}", SUPPORT_VER.getVersion(), dbVer.getVersion());
+            throw new FatalError(
+              "Database version is not compatible with application. Required: %s, Found: %s",
+              SUPPORT_VER.getVersion(),
+              dbVer.getVersion()
             );
-
-            entityClasses.forEach(clazz -> {
-                log.debug("Registering entity class: {}", clazz.getName());
-                cfg.managedClass(clazz);
-            });
-
-            this.entityManagerFactory = new HibernatePersistenceProvider().createEntityManagerFactory(cfg);
-
-
-            // 检查数据库版本
-            Semver dbVer = getDbVer();
-            if (!dbVer.equals(SUPPORT_VER)) {
-                log.error("数据库版本与应用程序不兼容。需要: {}, 现有: {}",
-                        SUPPORT_VER.getVersion(), dbVer.getVersion());
-                throw new RuntimeException("Database version is not compatible with application. " +
-                        "Required: " + SUPPORT_VER.getVersion() + ", Found: " + dbVer.getVersion());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize DatabaseManager", e);
         }
     }
 
@@ -130,29 +141,33 @@ public class DatabaseService {
     }
 
     private Semver getDbVer() {
-        return this.exec(em -> {
-            // 查询版本号
-            DatabaseVersion ver = em.find(DatabaseVersion.class, 0L);
+        try {
+            return this.exec(em -> {
+                // 查询版本号
+                DatabaseVersion ver = em.find(DatabaseVersion.class, 0L);
 
-            if (ver == null) {
-                ver = new DatabaseVersion();
-                ver.setId(0L);
-                ver.setVersion(SUPPORT_VER.getVersion());
+                if (ver == null) {
+                    ver = new DatabaseVersion();
+                    ver.setId(0L);
+                    ver.setVersion(SUPPORT_VER.getVersion());
 
-                em.persist(ver);
+                    em.persist(ver);
 
-                return SUPPORT_VER;
-            } else {
-                return new Semver(ver.getVersion());
-            }
-        });
+                    return SUPPORT_VER;
+                } else {
+                    return new Semver(ver.getVersion());
+                }
+            });
+        } catch (DbOperationException e) {
+            log.warn("获取数据库版本时发生错误，假定版本为0.0.0", e);
+            return new Semver("0.0.0");
+        }
     }
 
-    public <T> T exec(
-            Function<EntityManager, T> func
-    ) {
+    public <T> T exec(Function<EntityManager, T> func)
+    throws DbOperationException {
         if (this.entityManagerFactory == null) {
-            throw new IllegalStateException("DatabaseManager is not initialized. Call init() before using.");
+            throw new NotInitialized("DatabaseService is not initialized. Please call init() before using it.");
         }
 
         var em = this.entityManagerFactory.createEntityManager();
@@ -162,21 +177,20 @@ public class DatabaseService {
             var res = func.apply(em);
             em.getTransaction().commit();
             return res;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (em.getTransaction().isActive()) {
                 em.getTransaction().rollback();
             }
-            throw new RuntimeException("Database operation failed", e);
+            throw new DbOperationException("Database operation failed", e);
         } finally {
             em.close();
         }
     }
 
-    public void exec(
-            Consumer<EntityManager> func
-    ) {
+    public void exec(Consumer<EntityManager> func)
+    throws DbOperationException {
         if (this.entityManagerFactory == null) {
-            throw new IllegalStateException("DatabaseManager is not initialized. Call init() before using.");
+            throw new NotInitialized("DatabaseService is not initialized. Please call init() before using it.");
         }
 
         var em = this.entityManagerFactory.createEntityManager();
@@ -185,25 +199,21 @@ public class DatabaseService {
             em.getTransaction().begin();
             func.accept(em);
             em.getTransaction().commit();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (em.getTransaction().isActive()) {
                 em.getTransaction().rollback();
             }
-            throw new RuntimeException("Database operation failed", e);
+            throw new DbOperationException("Database operation failed", e);
         } finally {
             em.close();
         }
     }
 
-    public <T> CompletableFuture<T> execAsync(
-            Function<EntityManager, T> func
-    ) {
-        return CompletableFuture.supplyAsync(() -> exec(func), this.taskExecutorService.getExecutor());
+    public <T> CompletableFuture<T> execAsync(Function<EntityManager, T> func) {
+        return this.taskExecutorService.submit(() -> exec(func), false);
     }
 
-    public CompletableFuture<Void> execAsync(
-            Consumer<EntityManager> func
-    ) {
-        return CompletableFuture.runAsync(() -> exec(func), this.taskExecutorService.getExecutor());
+    public CompletableFuture<Object> execAsync(Consumer<EntityManager> func) {
+        return this.taskExecutorService.submit(() -> exec(func), false);
     }
 }

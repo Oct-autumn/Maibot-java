@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 @Component
 public class SystemEventService {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(SystemEventService.class);
-    private final Channel channel;
+    private final        Channel          channel;
 
     public SystemEventService() {
         this.channel = new EmbeddedChannel();

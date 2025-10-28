@@ -12,8 +12,8 @@ import java.util.List;
 @Getter
 @Setter
 @Table(
-        name = "interaction_stream",
-        indexes = {@Index(name = "idx_entity_group", columnList = "entity_id, group_id", unique = true)}
+  name = "interaction_stream",
+  indexes = {@Index(name = "idx_entity_group", columnList = "entity_id, group_id", unique = true)}
 )
 public class InteractionStream {
     @Id

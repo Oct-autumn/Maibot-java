@@ -36,7 +36,7 @@ dependencies {
 
 // Create build-inf.properties
 tasks.register("createBuildInf") {
-    val outputDir = file("src/main/resources/META-INF")
+    val outputDir = file("src/main/resources/org/maibot/sdk")
     val outputFile = file("$outputDir/build-inf.properties")
 
     val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"

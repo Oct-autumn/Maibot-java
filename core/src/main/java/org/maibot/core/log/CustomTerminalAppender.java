@@ -15,8 +15,8 @@ import java.util.stream.Stream;
 public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private static final String LOG_TEMPLATE = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ - @{{3} {6}}@ {7}\n{8}";
-    private static final String MDC_TEMPLATE = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
+    private static final String LOG_TEMPLATE       = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ {7} - @{{3} {6}}@\n{8}";
+    private static final String MDC_TEMPLATE       = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
     private static final String THROWABLE_TEMPLATE = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
 
     @Setter
@@ -33,15 +33,15 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
         };
 
         return AnsiFormatter.render(
-                LOG_TEMPLATE,
-                DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
-                event.getThreadName(),
-                levelColor,
-                String.format("%-5s", event.getLevel()),
-                compressLoggerName(event.getLoggerName(), 30),
-                event.getFormattedMessage(),
-                renderMDC(event),
-                renderThrowable(event)
+          LOG_TEMPLATE,
+          DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
+          event.getThreadName(),
+          levelColor,
+          String.format("%-5s", event.getLevel()),
+          compressLoggerName(event.getLoggerName(), 30),
+          event.getFormattedMessage(),
+          renderMDC(event),
+          renderThrowable(event)
         );
     }
 
@@ -57,11 +57,11 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
         }
 
         Stream<String> mdcEntries = event.getMDCPropertyMap().entrySet().stream()
-                .map(entry -> AnsiFormatter.render(
-                        MDC_TEMPLATE,
-                        entry.getKey(),
-                        entry.getValue()
-                ));
+                                         .map(entry -> AnsiFormatter.render(
+                                           MDC_TEMPLATE,
+                                           entry.getKey(),
+                                           entry.getValue()
+                                         ));
 
         StringJoiner mdcBuilder = new StringJoiner(", ", "[", "]");
         mdcEntries.forEach(mdcBuilder::add);
@@ -86,8 +86,8 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
         while (throwableProxy != null) {
             var firstLineBuilder = new StringBuilder();
             firstLineBuilder.append("Exception in thread")
-                    .append(" \"").append(event.getThreadName()).append("\" ")
-                    .append(throwableProxy.getClassName());
+                            .append(" \"").append(event.getThreadName()).append("\" ")
+                            .append(throwableProxy.getClassName());
             if (throwableProxy.getMessage() != null) {
                 firstLineBuilder.append(": ").append(throwableProxy.getMessage());
             }
@@ -96,14 +96,14 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
             var stackTraceElements = throwableProxy.getStackTraceElementProxyArray();
             for (var element : stackTraceElements) {
                 stackTraceBuilder.append("    ")
-                        .append(element.getSTEAsString())
-                        .append("\n");
+                                 .append(element.getSTEAsString())
+                                 .append("\n");
             }
 
             throwableBuilder.append(AnsiFormatter.render(
-                    THROWABLE_TEMPLATE,
-                    firstLineBuilder.toString(),
-                    stackTraceBuilder.toString()
+              THROWABLE_TEMPLATE,
+              firstLineBuilder.toString(),
+              stackTraceBuilder.toString()
             ));
 
             throwableProxy = throwableProxy.getCause();
@@ -146,13 +146,19 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
             int availableLen = maxLen - (loggerName.length() - lastPart.length()) - 3; // 3是"..."的长度
             if (availableLen > 0 && lastPart.length() > availableLen) {
                 return String.join(".", Arrays.copyOf(parts, parts.length - 1)) + "." +
-                        lastPart.substring(0, availableLen / 2) + "..." + lastPart.substring(lastPart.length() - availableLen / 2);
+                  lastPart.substring(
+                    0,
+                    availableLen / 2
+                  ) + "..." + lastPart.substring(lastPart.length() - availableLen / 2);
             }
         } else {
             // 非点分割的LoggerName，尝试移除中间部分
             int availableLen = maxLen - 3; // 3是"..."的长度
             if (availableLen > 0 && loggerName.length() > availableLen) {
-                return loggerName.substring(0, availableLen / 2) + "..." + loggerName.substring(loggerName.length() - availableLen / 2);
+                return loggerName.substring(
+                  0,
+                  availableLen / 2
+                ) + "..." + loggerName.substring(loggerName.length() - availableLen / 2);
             }
         }
 

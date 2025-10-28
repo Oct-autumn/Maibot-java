@@ -43,18 +43,18 @@ public class ThinkingFlow {
     private final int OBSERVATION_WINDOW_SIZE;
 
     /// 交互流ID
-    private final String id;
+    private final String       id;
     /// 观察者
     private final FlowObserver flowObserver = new FlowObserver(this);
 
     /// 交互流状态
     @Getter
-    private FlowState state = FlowState.SLEEPING;
+    private       FlowState      state               = FlowState.SLEEPING;
     /// 上次活跃时间戳
     @Getter
-    private long lastActiveTimestamp = System.currentTimeMillis();
+    private       long           lastActiveTimestamp = System.currentTimeMillis();
     /// 交互流观察窗口
-    private final Deque<Message> observationWindow = new ArrayDeque<>();
+    private final Deque<Message> observationWindow   = new ArrayDeque<>();
 
     protected ThinkingFlow(int max_observation_window_size, String id) {
         this.OBSERVATION_WINDOW_SIZE = max_observation_window_size;
@@ -99,13 +99,13 @@ public class ThinkingFlow {
 
         private final ThinkingFlow thinkingFlow;
 
-        private final ReentrantLock lock = new ReentrantLock();
-        private final Condition activityCondition = lock.newCondition();
-        private volatile boolean running = true;
+        private final    ReentrantLock lock              = new ReentrantLock();
+        private final    Condition     activityCondition = lock.newCondition();
+        private volatile boolean       running           = true;
 
         /// 交互流处于激活状态下的观察间隔
         @Setter
-        private int activeObservationIntervalSec = 15;
+        private int activeObservationIntervalSec  = 15;
         /// 交互流处于专注状态下的观察间隔
         @Setter
         private int focusedObservationIntervalSec = 5;

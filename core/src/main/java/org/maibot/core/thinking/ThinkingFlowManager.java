@@ -2,12 +2,13 @@ package org.maibot.core.thinking;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import org.maibot.core.cdi.Instance;
+import org.maibot.core.cdi.annotation.AutoInject;
+import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.db.DatabaseService;
 import org.maibot.core.db.dao.InteractionEntity;
 import org.maibot.core.db.dao.InteractionGroup;
 import org.maibot.core.db.dao.InteractionStream;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
+import org.maibot.core.exceptions.DbOperationException;
 import org.maibot.core.util.TaskExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,7 @@ public class ThinkingFlowManager {
     private static final Logger log = LoggerFactory.getLogger(ThinkingFlowManager.class);
 
     /* 单例资源区 */
-    private final DatabaseService databaseService;
+    private final DatabaseService     databaseService;
     private final TaskExecutorService taskExecutorService;
 
     /* 运行资源区 */
@@ -93,15 +94,15 @@ public class ThinkingFlowManager {
                 for (var stream : streams) {
                     String streamId = stream.getId();
                     var flow = Instance.get(ThinkingFlowFactory.class)
-                            .setFlowId(streamId)
-                            .build();
+                                       .setFlowId(streamId)
+                                       .build();
                     thinkingFlows.put(streamId, flow);
                 }
 
                 // TODO: 从数据库取聊天消息填充观察窗口
             });
-        } catch (Exception e) {
-            log.error("Failed to restore interaction streams from database.", e);
+        } catch (DbOperationException e) {
+            log.warn("Failed to restore interaction streams from database.", e);
         }
     }
 
@@ -110,8 +111,9 @@ public class ThinkingFlowManager {
      */
     private void runInteractionFlowObservers() {
         for (var flow : this.thinkingFlows.values()) {
-            if (flow.getState().isAtLeast(ThinkingFlow.FlowState.ACTIVE))
+            if (flow.getState().isAtLeast(ThinkingFlow.FlowState.ACTIVE)) {
                 this.taskExecutorService.submit(flow::observe, true);
+            }
         }
     }
 
@@ -122,42 +124,44 @@ public class ThinkingFlowManager {
      * @return 交互流实例
      */
     public ThinkingFlow getOrCreateInteractionFlow(String streamId) {
-        return thinkingFlows.computeIfAbsent(streamId, k -> {
-            assert streamId.matches("^([PG])-\\d+$");
-            String[] parts = streamId.split("-");
+        return thinkingFlows.computeIfAbsent(
+          streamId, k -> {
+              assert streamId.matches("^([PG])-\\d+$");
+              String[] parts = streamId.split("-");
 
-            // 持久化
-            databaseService.exec(em -> {
-                InteractionStream stream = new InteractionStream();
-                stream.setId(streamId);
+              // 持久化
+              databaseService.exec(em -> {
+                  InteractionStream stream = new InteractionStream();
+                  stream.setId(streamId);
 
-                if (parts[0].equals("P")) {
-                    // 私聊流
-                    Long userId = Long.parseLong(parts[1]);
-                    // 在数据库中查询对应的私聊对象是否存在
-                    var res = em.find(InteractionEntity.class, userId);
-                    if (res == null) {
-                        throw new RuntimeException("InteractionEntity with ID " + userId + " does not exist. This shouldn't happen.");
-                    }
-                    stream.setEntity(res);
-                } else if (parts[0].equals("G")) {
-                    // 群聊流
-                    Long groupId = Long.parseLong(parts[1]);
-                    // 在数据库中查询对应的群聊对象是否存在
-                    var res = em.find(InteractionGroup.class, groupId);
-                    if (res == null) {
-                        throw new RuntimeException("InteractionGroup with ID " + groupId + " does not exist. This shouldn't happen.");
-                    }
-                    stream.setGroup(res);
-                }
+                  if (parts[0].equals("P")) {
+                      // 私聊流
+                      Long userId = Long.parseLong(parts[1]);
+                      // 在数据库中查询对应的私聊对象是否存在
+                      var res = em.find(InteractionEntity.class, userId);
+                      if (res == null) {
+                          throw new RuntimeException("InteractionEntity with ID " + userId + " does not exist. This shouldn't happen.");
+                      }
+                      stream.setEntity(res);
+                  } else if (parts[0].equals("G")) {
+                      // 群聊流
+                      Long groupId = Long.parseLong(parts[1]);
+                      // 在数据库中查询对应的群聊对象是否存在
+                      var res = em.find(InteractionGroup.class, groupId);
+                      if (res == null) {
+                          throw new RuntimeException("InteractionGroup with ID " + groupId + " does not exist. This shouldn't happen.");
+                      }
+                      stream.setGroup(res);
+                  }
 
-                em.persist(stream);
-            });
+                  em.persist(stream);
+              });
 
-            return Instance.get(ThinkingFlowFactory.class)
-                    .setFlowId(streamId)
-                    .build();
-        });
+              return Instance.get(ThinkingFlowFactory.class)
+                             .setFlowId(streamId)
+                             .build();
+          }
+        );
     }
 
     public int[] getFlowStatesCount() {

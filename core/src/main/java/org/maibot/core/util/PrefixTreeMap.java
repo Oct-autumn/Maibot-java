@@ -6,8 +6,8 @@ import java.util.Map;
 public class PrefixTreeMap<T, V> {
     static class PrefixTreeMapNode<T, V> {
         private Map<T, PrefixTreeMapNode<T, V>> children = null;
-        private boolean isEnd = false;
-        private V value = null;
+        private boolean                         isEnd    = false;
+        private V                               value    = null;
     }
 
     private final PrefixTreeMapNode<T, V> root = new PrefixTreeMapNode<>();

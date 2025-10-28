@@ -1,9 +1,9 @@
 package org.maibot.core.modloader;
 
 import lombok.NonNull;
-import org.maibot.core.modloader.exceptions.CircularDependence;
-import org.maibot.core.modloader.exceptions.DependencyNotExist;
-import org.maibot.core.modloader.exceptions.DuplicateMod;
+import org.maibot.core.exceptions.CircularDependence;
+import org.maibot.core.exceptions.DependencyNotExist;
+import org.maibot.core.exceptions.DuplicateMod;
 import org.semver4j.Semver;
 
 import java.util.*;
@@ -47,14 +47,17 @@ public class DependencyTree {
     private final Map<String, MetaNode> nodes = new HashMap<>();
 
     public DependencyTree(Semver sdkVersion) {
-        nodes.put("sdk", new MetaNode(
-                "sdk",
-                sdkVersion,
-                ""
-        ));
+        nodes.put(
+          "sdk", new MetaNode(
+            "sdk",
+            sdkVersion,
+            ""
+          )
+        );
     }
 
-    public void addMod(String modId, String version, String mainClass) throws DuplicateMod {
+    public void addMod(String modId, String version, String mainClass)
+    throws DuplicateMod {
         if (nodes.containsKey(modId)) {
             throw new DuplicateMod("Duplicate mod detected: %s", modId);
         }
@@ -81,7 +84,11 @@ public class DependencyTree {
 
         if (depMetaNode == null) {
             if (isMandatory) {
-                throw new DependencyNotExist("The mandatory dependency '%s' for mod '%s' does not exist.", depModId, modId);
+                throw new DependencyNotExist(
+                  "The mandatory dependency '%s' for mod '%s' does not exist.",
+                  depModId,
+                  modId
+                );
             }
             // 非强制依赖且依赖不存在，忽略
             return;
@@ -94,11 +101,11 @@ public class DependencyTree {
         Semver depVersion = depMetaNode.version();
         if (!checkVersion(depVersion, versionRange)) {
             throw new DependencyNotExist(
-                    "The dependency '%s' for mod '%s' does not meet the version requirement: %s. Found version: %s",
-                    depModId,
-                    modId,
-                    versionRange,
-                    depVersion.getVersion()
+              "The dependency '%s' for mod '%s' does not meet the version requirement: %s. Found version: %s",
+              depModId,
+              modId,
+              versionRange,
+              depVersion.getVersion()
             );
         }
 
@@ -150,7 +157,8 @@ public class DependencyTree {
      * @return 加载顺序的Mod ID队列
      * @throws CircularDependence 如果存在循环依赖则抛出异常
      */
-    public Queue<String> resolveLoadOrder() throws CircularDependence {
+    public Queue<String> resolveLoadOrder()
+    throws CircularDependence {
         // Kahn算法实现拓扑排序，检测循环依赖
         Map<String, Integer> inDegree = new HashMap<>();
         for (var nodeEntry : nodes.entrySet()) {
@@ -185,8 +193,8 @@ public class DependencyTree {
             Set<String> remainingNodes = new HashSet<>(nodes.keySet());
             loadOrder.forEach(remainingNodes::remove);
             throw new CircularDependence(
-                    "Circular dependency detected among mods: %s",
-                    String.join(", ", remainingNodes)
+              "Circular dependency detected among mods: %s",
+              String.join(", ", remainingNodes)
             );
         }
 

@@ -11,6 +11,10 @@ public class FatalError extends RuntimeException {
         super(message);
     }
 
+    public FatalError(Throwable cause) {
+        super(cause);
+    }
+
     public FatalError(String format, Object... args) {
         super(String.format(format, args));
 

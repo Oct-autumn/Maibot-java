@@ -1,7 +1,13 @@
 package org.maibot.core.net;
 
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.net.http.PingPongHandler;
 import org.maibot.sdk.network.HttpRequestProcessor;
@@ -36,7 +42,7 @@ public class HttpDispatchHandler extends SimpleChannelInboundHandler<FullHttpReq
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
         var method = req.method().toString();
         var parser = new QueryStringDecoder(req.uri());
         var path = parser.path();
@@ -45,11 +51,11 @@ public class HttpDispatchHandler extends SimpleChannelInboundHandler<FullHttpReq
             log.trace("找到 METHOD: {}, PATH: {} 的HTTP请求处理器，开始处理", method, path);
             try {
                 processors.get(key).process(ctx, req);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log.error("处理 METHOD: {}, PATH: {} 的HTTP请求时发生异常: {}", method, path, e.getMessage(), e);
                 var resp = new DefaultHttpResponse(
-                        req.protocolVersion(),
-                        HttpResponseStatus.INTERNAL_SERVER_ERROR
+                  req.protocolVersion(),
+                  HttpResponseStatus.INTERNAL_SERVER_ERROR
                 );
 
                 ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
@@ -59,8 +65,8 @@ public class HttpDispatchHandler extends SimpleChannelInboundHandler<FullHttpReq
         } else {
             log.warn("未找到 METHOD:{}, PATH: {} 的HTTP请求处理器，返回404", method, path);
             var resp = new DefaultHttpResponse(
-                    req.protocolVersion(),
-                    HttpResponseStatus.NOT_FOUND
+              req.protocolVersion(),
+              HttpResponseStatus.NOT_FOUND
             );
 
             ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);

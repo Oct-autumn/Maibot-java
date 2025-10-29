@@ -4,8 +4,8 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,13 +14,13 @@ import org.slf4j.LoggerFactory;
 public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
     private static final Logger log = LoggerFactory.getLogger(DispatchHandler.class);
 
-    private final HttpDispatchHandler httpDispatchHandler;
-    private final WsDispatchHandler   wsDispatchHandler;
+    private final HttpRouteHandler httpRouteHandler;
+    private final WsRouteHandler   wsRouteHandler;
 
     @AutoInject
-    public DispatchHandler(HttpDispatchHandler httpDispatchHandler, WsDispatchHandler wsDispatchHandler) {
-        this.httpDispatchHandler = httpDispatchHandler;
-        this.wsDispatchHandler = wsDispatchHandler;
+    public DispatchHandler(HttpRouteHandler httpRouteHandler, WsRouteHandler wsRouteHandler) {
+        this.httpRouteHandler = httpRouteHandler;
+        this.wsRouteHandler = wsRouteHandler;
     }
 
     @Override
@@ -29,11 +29,11 @@ public class DispatchHandler extends SimpleChannelInboundHandler<Object> {
             if (isWebSocketUpgrade(request)) {
                 // WebSocket升级请求
                 log.debug("收到WebSocket升级请求: URI：{}", request.uri());
-                ctx.pipeline().addBefore("exceptionHandler", "wsUpgradeHandler", wsDispatchHandler);
+                ctx.pipeline().addBefore("exceptionHandler", "wsUpgradeHandler", wsRouteHandler);
             } else {
                 // 普通HTTP请求
                 log.debug("收到HTTP请求: METHOD: {}, URI: {}", request.method(), request.uri());
-                ctx.pipeline().addBefore("exceptionHandler", "httpDispatchHandler", httpDispatchHandler);
+                ctx.pipeline().addBefore("exceptionHandler", "httpDispatchHandler", httpRouteHandler);
             }
             ctx.fireChannelRead(request.retain());
 

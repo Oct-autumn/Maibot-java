@@ -1,49 +1,15 @@
 package org.maibot.core.modloader;
 
 import lombok.NonNull;
-import org.maibot.core.exceptions.CircularDependence;
-import org.maibot.core.exceptions.DependencyNotExist;
-import org.maibot.core.exceptions.DuplicateMod;
+import org.maibot.sdk.exceptions.CircularDependence;
+import org.maibot.sdk.exceptions.DependencyNotExist;
+import org.maibot.sdk.exceptions.DuplicateMod;
 import org.semver4j.Semver;
 
 import java.util.*;
 import java.util.regex.Pattern;
 
 public class DependencyTree {
-    static class MetaNode {
-        private final String modId;
-        private final Semver version;
-        private final String mainClass;
-
-        private final List<MetaNode> dependencies = new ArrayList<>();
-
-        public MetaNode(@NonNull String modId, @NonNull Semver version, @NonNull String mainClass) {
-            this.modId = modId;
-            this.version = version;
-            this.mainClass = mainClass;
-        }
-
-        public String modId() {
-            return modId;
-        }
-
-        public Semver version() {
-            return version;
-        }
-
-        public String mainClass() {
-            return mainClass;
-        }
-
-        public List<MetaNode> dependencies() {
-            return dependencies;
-        }
-
-        public void addDependency(@NonNull DependencyTree.MetaNode metaNode) {
-            this.dependencies.add(metaNode);
-        }
-    }
-
     private final Map<String, MetaNode> nodes = new HashMap<>();
 
     public DependencyTree(Semver sdkVersion) {
@@ -199,5 +165,39 @@ public class DependencyTree {
         }
 
         return loadOrder;
+    }
+
+    static class MetaNode {
+        private final String modId;
+        private final Semver version;
+        private final String mainClass;
+
+        private final List<MetaNode> dependencies = new ArrayList<>();
+
+        public MetaNode(@NonNull String modId, @NonNull Semver version, @NonNull String mainClass) {
+            this.modId = modId;
+            this.version = version;
+            this.mainClass = mainClass;
+        }
+
+        public String modId() {
+            return modId;
+        }
+
+        public Semver version() {
+            return version;
+        }
+
+        public String mainClass() {
+            return mainClass;
+        }
+
+        public List<MetaNode> dependencies() {
+            return dependencies;
+        }
+
+        public void addDependency(@NonNull DependencyTree.MetaNode metaNode) {
+            this.dependencies.add(metaNode);
+        }
     }
 }

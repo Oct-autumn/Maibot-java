@@ -7,12 +7,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
-import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.util.TaskExecutorService;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
+import org.maibot.sdk.ioc.Value;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 
@@ -22,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 @Component
-public class InnerServer {
+public class InnerServer implements DestroyableComponent {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(InnerServer.class);
 
     private final ServerBootstrap     bootstrap;
@@ -113,11 +114,12 @@ public class InnerServer {
             log.warn("网络服务运行中断");
             throw new FatalError("InnerServer interrupted", e);
         } finally {
-            this.shutdown();
+            this.preDestroy();
         }
     }
 
-    public void shutdown() {
+    @Override
+    public void preDestroy() {
         try {
             if (this.bossGroup != null) {
                 this.bossGroup.shutdownGracefully().sync();

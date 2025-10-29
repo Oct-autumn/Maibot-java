@@ -1,13 +1,14 @@
 package org.maibot.core.modloader;
 
 import com.moandjiezana.toml.Toml;
-import org.maibot.core.cdi.Instance;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.config.BuildInfo;
-import org.maibot.sdk.Mod;
+import org.maibot.core.ioc.Instance;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.UnignorableException;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
+import org.maibot.sdk.mod.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
 @Component
-public class ModManager {
+public class ModManager implements DestroyableComponent {
     private static final Logger log            = LoggerFactory.getLogger(ModManager.class);
     private static final String MODS_DIRECTORY = "mods";
     private static final String MOD_META_PATH  = "META-INF/mod.toml";
@@ -35,6 +36,29 @@ public class ModManager {
     @AutoInject
     private ModManager(BuildInfo buildInfo) {
         this.buildInfo = buildInfo;
+    }
+
+    /**
+     * 从Toml读取Mod元数据
+     *
+     * @return Mod元数据对象
+     * @throws UnignorableException 如果读取或解析失败
+     */
+    private static ModMeta readModMeta(JarFile modJar)
+    throws UnignorableException {
+        try (InputStream is = modJar.getInputStream(modJar.getJarEntry(MOD_META_PATH))) {
+            if (is == null) {
+                throw new UnignorableException("Mod JAR does not contain %s", MOD_META_PATH);
+            }
+
+            Toml metaToml = new Toml().read(is);
+
+            // 考虑到Mod开发时构建脚本中提供了完善的校验，这里不再进行冗余的字段检查
+
+            return metaToml.to(ModMeta.class);
+        } catch (IOException e) {
+            throw new UnignorableException("Failed to read mod metadata from %s", modJar.getName(), e);
+        }
     }
 
     /**
@@ -159,27 +183,14 @@ public class ModManager {
         }
     }
 
-    /**
-     * 从Toml读取Mod元数据
-     *
-     * @return Mod元数据对象
-     * @throws UnignorableException 如果读取或解析失败
-     */
-    private static ModMeta readModMeta(JarFile modJar)
-    throws UnignorableException {
-        try (InputStream is = modJar.getInputStream(modJar.getJarEntry(MOD_META_PATH))) {
-            if (is == null) {
-                throw new UnignorableException("Mod JAR does not contain %s", MOD_META_PATH);
+    @Override
+    public void preDestroy() {
+        loadedMods.values().forEach(mod -> {
+            try {
+                mod.onUnload();
+            } catch (Throwable e) {
+                log.error("卸载Mod {} 时发生异常: {}", mod.getClass().getName(), e.getMessage(), e);
             }
-
-            Toml metaToml = new Toml().read(is);
-
-            // 考虑到Mod开发时构建脚本中提供了完善的校验，这里不再进行冗余的字段检查
-
-            return metaToml.to(ModMeta.class);
-        } catch (IOException e) {
-            throw new UnignorableException("Failed to read mod metadata from %s", modJar.getName(), e);
-        }
+        });
     }
-
 }

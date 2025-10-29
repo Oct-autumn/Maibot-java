@@ -4,17 +4,18 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
 import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
-import org.maibot.core.cdi.annotation.Value;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.db.dao.DatabaseVersion;
-import org.maibot.core.exceptions.DbOperationException;
-import org.maibot.core.exceptions.NotInitialized;
 import org.maibot.core.util.ClassScanner;
 import org.maibot.core.util.TaskExecutorService;
+import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.exceptions.NotInitialized;
 import org.maibot.sdk.exceptions.UnignorableException;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
+import org.maibot.sdk.ioc.Value;
 import org.semver4j.Semver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Component
-public class DatabaseService {
+public class DatabaseService implements DestroyableComponent {
     private static final Logger log         = LoggerFactory.getLogger(DatabaseService.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
@@ -129,7 +130,8 @@ public class DatabaseService {
     /**
      * 关闭数据库
      */
-    public void close() {
+    @Override
+    public void preDestroy() {
         if (this.entityManagerFactory != null) {
             try {
                 this.entityManagerFactory.close();

@@ -1,0 +1,30 @@
+<code_scheme name="Default" version="173">
+    <JavaCodeStyleSettings>
+        <option name="ALIGN_MULTILINE_TEXT_BLOCKS" value="true"/>
+    </JavaCodeStyleSettings>
+    <codeStyleSettings language="JAVA">
+        <option name="RIGHT_MARGIN" value="120"/>
+        <option name="ALIGN_MULTILINE_CHAINED_METHODS" value="true"/>
+        <option name="ALIGN_MULTILINE_PARAMETERS_IN_CALLS" value="true"/>
+        <option name="ALIGN_MULTILINE_THROWS_LIST" value="true"/>
+        <option name="ALIGN_THROWS_KEYWORD" value="true"/>
+        <option name="ALIGN_GROUP_FIELD_DECLARATIONS" value="true"/>
+        <option name="CALL_PARAMETERS_WRAP" value="5"/>
+        <option name="CALL_PARAMETERS_LPAREN_ON_NEXT_LINE" value="true"/>
+        <option name="CALL_PARAMETERS_RPAREN_ON_NEXT_LINE" value="true"/>
+        <option name="METHOD_PARAMETERS_WRAP" value="5"/>
+        <option name="METHOD_PARAMETERS_LPAREN_ON_NEXT_LINE" value="true"/>
+        <option name="METHOD_PARAMETERS_RPAREN_ON_NEXT_LINE" value="true"/>
+        <option name="THROWS_KEYWORD_WRAP" value="2"/>
+        <option name="METHOD_CALL_CHAIN_WRAP" value="5"/>
+        <option name="BINARY_OPERATION_SIGN_ON_NEXT_LINE" value="true"/>
+        <option name="IF_BRACE_FORCE" value="1"/>
+        <option name="DOWHILE_BRACE_FORCE" value="1"/>
+        <option name="WHILE_BRACE_FORCE" value="1"/>
+        <option name="FOR_BRACE_FORCE" value="1"/>
+        <option name="SOFT_MARGINS" value="120"/>
+        <indentOptions>
+            <option name="CONTINUATION_INDENT_SIZE" value="2"/>
+        </indentOptions>
+    </codeStyleSettings>
+</code_scheme>

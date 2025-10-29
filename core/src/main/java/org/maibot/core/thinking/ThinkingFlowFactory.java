@@ -1,8 +1,8 @@
 package org.maibot.core.thinking;
 
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.ObjectFactory;
-import org.maibot.core.cdi.annotation.Value;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.ObjectFactory;
+import org.maibot.sdk.ioc.Value;
 
 @ObjectFactory
 public class ThinkingFlowFactory {

@@ -8,12 +8,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class AnsiFormatter {
+    public static final  String  HEX_PREFIX           = "#";
     private static final Pattern FORMAT_BLOCK_PATTERN =
       Pattern.compile("@\\{(?<codes>[^ ]+) (?<text>.*?)}@");
     private static final Pattern PLACEHOLDER_PATTERN  =
       Pattern.compile("\\{(?<idx>\\d*)}");
-
-    public static final String HEX_PREFIX = "#";
 
     /**
      * 解析并渲染ANSI字符串

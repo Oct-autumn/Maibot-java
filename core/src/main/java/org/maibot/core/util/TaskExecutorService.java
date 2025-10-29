@@ -2,8 +2,9 @@ package org.maibot.core.util;
 
 import lombok.Getter;
 import lombok.NonNull;
-import org.maibot.core.cdi.annotation.Component;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 提供线程池和虚拟线程池用于任务执行
  */
 @Component
-public class TaskExecutorService {
+public class TaskExecutorService implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(TaskExecutorService.class);
 
     @Getter
@@ -146,7 +147,8 @@ public class TaskExecutorService {
     /**
      * 关闭所有执行器
      */
-    public void shutdown() {
+    @Override
+    public void preDestroy() {
         try {
             this.executor.shutdown();
             this.virtualExecutor.shutdown();

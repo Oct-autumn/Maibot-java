@@ -1,5 +1,5 @@
-import java.time.Instant
 import java.security.MessageDigest
+import java.time.Instant
 
 plugins {
     id("java")
@@ -51,7 +51,7 @@ dependencies {
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
     // SDK Dependency
-    implementation(files("../sdk/build/libs/sdk-0.1.0-Alpha.jar"))
+    implementation(project(":sdk"))
 }
 
 tasks.test {
@@ -76,10 +76,6 @@ tasks.register("createBuildInf") {
         """.trimIndent()
         )
     }
-}
-
-tasks.named("compileJava") {
-    dependsOn(":sdk:jar")
 }
 
 tasks.named("processResources") {

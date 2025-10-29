@@ -2,9 +2,9 @@ package org.maibot.core.thinking;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.db.dao.InteractionStream;
 import org.maibot.core.db.dao.Message;
+import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,38 +23,19 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component(singleton = false)
 public class ThinkingFlow {
-    public enum FlowState {
-        SLEEPING(0),
-        ACTIVE(1),
-        FOCUSED(2);
-
-        @Getter
-        private final int code;
-
-        FlowState(int code) {
-            this.code = code;
-        }
-
-        boolean isAtLeast(FlowState other) {
-            return this.code >= other.code;
-        }
-    }
-
-    private final int OBSERVATION_WINDOW_SIZE;
-
+    private final int            OBSERVATION_WINDOW_SIZE;
     /// 交互流ID
-    private final String       id;
+    private final String         id;
     /// 观察者
-    private final FlowObserver flowObserver = new FlowObserver(this);
-
+    private final FlowObserver   flowObserver        = new FlowObserver(this);
+    /// 交互流观察窗口
+    private final Deque<Message> observationWindow   = new ArrayDeque<>();
     /// 交互流状态
     @Getter
     private       FlowState      state               = FlowState.SLEEPING;
     /// 上次活跃时间戳
     @Getter
     private       long           lastActiveTimestamp = System.currentTimeMillis();
-    /// 交互流观察窗口
-    private final Deque<Message> observationWindow   = new ArrayDeque<>();
 
     protected ThinkingFlow(int max_observation_window_size, String id) {
         this.OBSERVATION_WINDOW_SIZE = max_observation_window_size;
@@ -88,6 +69,23 @@ public class ThinkingFlow {
         this.lastActiveTimestamp = System.currentTimeMillis();
         if (!this.state.isAtLeast(FlowState.ACTIVE)) {
             this.setState(FlowState.ACTIVE);
+        }
+    }
+
+    public enum FlowState {
+        SLEEPING(0),
+        ACTIVE(1),
+        FOCUSED(2);
+
+        @Getter
+        private final int code;
+
+        FlowState(int code) {
+            this.code = code;
+        }
+
+        boolean isAtLeast(FlowState other) {
+            return this.code >= other.code;
         }
     }
 

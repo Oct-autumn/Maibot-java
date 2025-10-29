@@ -1,15 +1,16 @@
 package org.maibot.core.thinking;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
-import org.maibot.core.cdi.Instance;
-import org.maibot.core.cdi.annotation.AutoInject;
-import org.maibot.core.cdi.annotation.Component;
 import org.maibot.core.db.DatabaseService;
 import org.maibot.core.db.dao.InteractionEntity;
 import org.maibot.core.db.dao.InteractionGroup;
 import org.maibot.core.db.dao.InteractionStream;
-import org.maibot.core.exceptions.DbOperationException;
+import org.maibot.core.ioc.Instance;
 import org.maibot.core.util.TaskExecutorService;
+import org.maibot.sdk.exceptions.DbOperationException;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 4. 休眠：当交互流中长时间没有活跃交流时，该流进入休眠状态；<br>
  */
 @Component
-public class ThinkingFlowManager {
+public class ThinkingFlowManager implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(ThinkingFlowManager.class);
 
     /* 单例资源区 */
@@ -60,7 +61,8 @@ public class ThinkingFlowManager {
     /**
      * 关闭思维流管理器
      */
-    public void shutdown() {
+    @Override
+    public void preDestroy() {
         for (var flow : this.thinkingFlows.values()) {
             flow.stopObserving();
         }

@@ -4,12 +4,12 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.moandjiezana.toml.Toml;
-import org.maibot.core.cdi.annotation.Component;
-import org.maibot.core.exceptions.InvalidConfigPath;
-import org.maibot.core.exceptions.NotInitialized;
 import org.maibot.core.util.JsonValidator;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.IgnorableException;
+import org.maibot.sdk.exceptions.InvalidConfigPath;
+import org.maibot.sdk.exceptions.NotInitialized;
+import org.maibot.sdk.ioc.Component;
 
 import java.io.File;
 import java.io.IOException;

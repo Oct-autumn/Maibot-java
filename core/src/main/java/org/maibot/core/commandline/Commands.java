@@ -1,6 +1,6 @@
 package org.maibot.core.commandline;
 
-import org.maibot.core.cdi.Instance;
+import org.maibot.core.ioc.Instance;
 import picocli.CommandLine;
 
 public class Commands {

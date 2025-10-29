@@ -3,7 +3,7 @@ package org.maibot.core.net;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import org.maibot.core.cdi.annotation.Component;
+import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

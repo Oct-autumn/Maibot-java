@@ -1,8 +1,8 @@
 package org.maibot.core.config;
 
-import org.maibot.core.cdi.annotation.Component;
 import org.maibot.sdk.SdkVersion;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.ioc.Component;
 import org.semver4j.Semver;
 
 import java.io.IOException;

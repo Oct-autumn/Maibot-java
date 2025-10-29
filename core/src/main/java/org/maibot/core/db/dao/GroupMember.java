@@ -14,6 +14,23 @@ import java.util.Objects;
 @Table(name = "group_member")
 @IdClass(GroupMember.GroupMemberId.class)
 public class GroupMember {
+    @Id
+    private Long              entityId;
+    @Id
+    private Long              groupId;
+    @ManyToOne
+    @JoinColumn(name = "entityId", insertable = false, updatable = false)
+    private InteractionEntity entity;
+    @ManyToOne
+    @JoinColumn(name = "groupId", insertable = false, updatable = false)
+    private InteractionGroup  group;
+    @Column(name = "created_at", nullable = false)
+    @CreationTimestamp
+    private String            createdAt;
+    @Column(name = "updated_at", nullable = false)
+    @UpdateTimestamp
+    private String            updatedAt;
+
     public static class GroupMemberId {
         private Long entityId;
         private Long groupId;
@@ -39,26 +56,4 @@ public class GroupMember {
             return Objects.hash(entityId, groupId);
         }
     }
-
-    @Id
-    private Long entityId;
-
-    @Id
-    private Long groupId;
-
-    @ManyToOne
-    @JoinColumn(name = "entityId", insertable = false, updatable = false)
-    private InteractionEntity entity;
-
-    @ManyToOne
-    @JoinColumn(name = "groupId", insertable = false, updatable = false)
-    private InteractionGroup group;
-
-    @Column(name = "created_at", nullable = false)
-    @CreationTimestamp
-    private String createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    @UpdateTimestamp
-    private String updatedAt;
 }

@@ -1,6 +1,6 @@
 package org.maibot.core.cache;
 
-import org.maibot.core.cdi.annotation.Component;
+import org.maibot.sdk.ioc.Component;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

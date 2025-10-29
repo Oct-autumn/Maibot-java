@@ -15,16 +15,26 @@ import java.util.List;
 @SuppressWarnings({"unused", "ClassCanBeRecord"}) // 抑制警告：未使用、可以转化为记录类
 @AllArgsConstructor
 public final class MainConfig {
+    @SerializedName("log")
+    public final Log       log;
+    @SerializedName("network")
+    public final Network   network;
+    @SerializedName("local_data")
+    public final LocalData localData;
+    @SerializedName("thinking")
+    public final Thinking  thinking;
+
     @AllArgsConstructor
     public final static class Log {
+        public final ConsoleLogSettings console;
+        public final FileLogSettings    file;
+
         @AllArgsConstructor
         public static class FilterSettings {
-            public final String level;
-
+            public final String       level;
             @SerializedName("filter_rule")
             public final List<String> filterRule;
         }
-
 
         public static final class ConsoleLogSettings extends FilterSettings {
             public ConsoleLogSettings(String level, List<String> filterRule) {
@@ -40,9 +50,6 @@ public final class MainConfig {
                 this.path = path;
             }
         }
-
-        public final ConsoleLogSettings console;
-        public final FileLogSettings    file;
     }
 
     @AllArgsConstructor
@@ -53,13 +60,13 @@ public final class MainConfig {
 
     @AllArgsConstructor
     public static final class LocalData {
+        public final Database database;
+
         @AllArgsConstructor
         public static class Database {
             @SerializedName("sqlite_path")
             public final String sqlitePath;
         }
-
-        public final Database database;
     }
 
     @AllArgsConstructor
@@ -67,16 +74,4 @@ public final class MainConfig {
         @SerializedName("observation_window_size")
         public final Integer observationWindowSize;
     }
-
-    @SerializedName("log")
-    public final Log log;
-
-    @SerializedName("network")
-    public final Network network;
-
-    @SerializedName("local_data")
-    public final LocalData localData;
-
-    @SerializedName("thinking")
-    public final Thinking thinking;
 }

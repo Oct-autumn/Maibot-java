@@ -2,9 +2,9 @@ package org.maibot.core.util;
 
 import lombok.Getter;
 import lombok.NonNull;
+import org.maibot.sdk.TaskExecutorService;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.ioc.Component;
-import org.maibot.sdk.ioc.DestroyableComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,20 +17,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 提供线程池和虚拟线程池用于任务执行
  */
 @Component
-public class TaskExecutorService implements DestroyableComponent {
-    private static final Logger log = LoggerFactory.getLogger(TaskExecutorService.class);
+public final class TaskExecutorServiceImpl extends TaskExecutorService {
+    private static final Logger log = LoggerFactory.getLogger(TaskExecutorServiceImpl.class);
 
     @Getter
     private final ThreadPoolExecutor executor;
     @Getter
     private final ExecutorService    virtualExecutor;
 
-    public TaskExecutorService() {
+    public TaskExecutorServiceImpl() {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             log.error("An uncaught exception occurred in thread {}", t.getName(), e);
             System.exit(1);
         });
-
         var processorCount = Runtime.getRuntime().availableProcessors();
         this.executor = new ThreadPoolExecutor(
           processorCount,
@@ -80,6 +79,7 @@ public class TaskExecutorService implements DestroyableComponent {
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
+    @Override
     public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT) {
         var future = new CompletableFuture<T>();
 
@@ -115,6 +115,7 @@ public class TaskExecutorService implements DestroyableComponent {
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
+    @Override
     public CompletableFuture<Object> submit(Runnable task, boolean virT) {
         var future = new CompletableFuture<>();
 

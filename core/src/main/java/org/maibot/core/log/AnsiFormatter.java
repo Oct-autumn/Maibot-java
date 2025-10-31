@@ -30,7 +30,6 @@ public class AnsiFormatter {
      *     AnsiParser.render("@{{} Hello {}!}@", "#ff0000", "World");
      *     // 渲染结果为：Hello World!，其中Hello World!为红色（24位色）
      * </pre></blockquote>
-     * <p>
      *
      * @param format 模板串
      * @param args   参数

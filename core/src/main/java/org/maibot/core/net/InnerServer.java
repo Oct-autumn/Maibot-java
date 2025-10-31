@@ -8,7 +8,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import org.maibot.core.config.MainConfig;
-import org.maibot.core.util.TaskExecutorService;
+import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -26,8 +26,8 @@ import java.util.concurrent.CompletionException;
 public class InnerServer implements DestroyableComponent {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(InnerServer.class);
 
-    private final ServerBootstrap     bootstrap;
-    private final TaskExecutorService taskExecutorService;
+    private final ServerBootstrap         bootstrap;
+    private final TaskExecutorServiceImpl taskExecutorService;
 
     private final MainConfig.Network conf;
 
@@ -37,7 +37,7 @@ public class InnerServer implements DestroyableComponent {
     @AutoInject
     public InnerServer(
       @Value("${network}") MainConfig.Network conf,
-      TaskExecutorService taskExecutorService,
+      TaskExecutorServiceImpl taskExecutorService,
       DispatchHandler dispatchHandler,
       ExceptionHandler exceptionHandler
     ) {

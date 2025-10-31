@@ -19,7 +19,6 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>
  * 思维流是对交互流的思考与决策单元。<br>
  * 它负责观察交互流中的消息内容，并根据预设的规则和模型做出相应的反应和决策。
- * <p>
  */
 @Component(singleton = false)
 public class ThinkingFlow {

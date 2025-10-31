@@ -27,15 +27,21 @@ public final class Instance {
      * @param basePackage 要扫描的基础包名
      */
     public static void scanImplementations(String basePackage) {
-        Set<Class<?>> classes;
+        Set<Class<?>> classes = new HashSet<>();
         try {
             // 扫描指定包下的所有类，找到带有 @Component 注解的实现类
-            classes = ClassScanner.fileScan(
+            classes.addAll(ClassScanner.fileScan(
               basePackage, c -> {
                   // 必须是Component、非接口、非抽象类
                   return c.isAnnotationPresent(Component.class) && !c.isInterface() && !Modifier.isAbstract(c.getModifiers());
               }
-            );
+            ));
+            classes.addAll(ClassScanner.jarScan(
+              Thread.currentThread().getContextClassLoader(), basePackage, c -> {
+                  // 必须是Component、非接口、非抽象类
+                  return c.isAnnotationPresent(Component.class) && !c.isInterface() && !Modifier.isAbstract(c.getModifiers());
+              }
+            ));
         } catch (UnignorableException e) {
             throw new FatalError("Failed to scan implementations in package '%s'", basePackage, e);
         }
@@ -66,7 +72,7 @@ public final class Instance {
      * @return 类的实例
      * @throws InstanceConstructException 如果实例创建失败或检测到循环依赖
      */
-    public static <T> T get(Class<T> clazz)
+    private static <T> T getInst(Class<T> clazz)
     throws InstanceConstructException {
         var stack = constructionStack.get();
         if (stack.contains(clazz)) {
@@ -134,6 +140,40 @@ public final class Instance {
         } finally {
             // 移除构造标记
             stack.remove(clazz);
+        }
+    }
+
+    /**
+     * 获取接口或类的指定实现的实例
+     * <p>
+     * 不推荐使用此方法，建议使用构造函数注入
+     *
+     * @param interfaceOrClass 接口或类
+     * @param name             实现名称
+     * @param <T>              接口或类的类型
+     * @return 接口或类的指定实现的实例
+     */
+    public static <T> T get(Class<T> interfaceOrClass, String name) {
+        Class<?> implClass = implManager.getImpl(interfaceOrClass, name);
+        return interfaceOrClass.cast(getInst(implClass));
+    }
+
+    /**
+     * 获取接口或类的默认实现的实例
+     * <p>
+     * 不推荐使用此方法，建议使用构造函数注入
+     *
+     * @param interfaceOrClass 接口或类
+     * @param <T>              接口或类的类型
+     * @return 接口或类的默认实现的实例
+     */
+    public static <T> T get(Class<T> interfaceOrClass) {
+        try {
+            Class<?> implClass = implManager.getImpl(interfaceOrClass);
+            return interfaceOrClass.cast(getInst(implClass));
+        } catch (ClassNoImplementation e) {
+            // 未托管的类，尝试直接创建实例
+            return getInst(interfaceOrClass);
         }
     }
 
@@ -209,9 +249,9 @@ public final class Instance {
                 } else if (param.isAnnotationPresent(Specify.class)) {
                     // 指定实现
                     String implClassName = param.getAnnotation(Specify.class).name();
-                    params[idx] = get(implManager.getImpl(param.getType(), implClassName));
+                    params[idx] = getInst(implManager.getImpl(param.getType(), implClassName));
                 } else {
-                    params[idx] = get(implManager.getImpl(param.getType()));
+                    params[idx] = getInst(implManager.getImpl(param.getType()));
                 }
             }
             autoConstructor.setAccessible(true);
@@ -238,7 +278,7 @@ public final class Instance {
     throws InvalidConfigPath {
         if (value.startsWith("${") && value.endsWith("}")) {
             // 符合格式的配置项，从配置文件中读取
-            var confMgr = Instance.get(ConfigService.class);
+            var confMgr = Instance.getInst(ConfigService.class);
             var path = value.substring(2, value.length() - 1);
             return confMgr.getFromRaw(path, valueType);
         }
@@ -314,17 +354,18 @@ public final class Instance {
 
         private Class<?> getImpl(Class<?> interfaceOrClass) {
             var implMap = implementations.get(interfaceOrClass);
+            Class<?> implClass;
             if (implMap == null) {
                 // 没有任何实现
                 throw new ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName());
             } else if (implMap.primary != null) {
                 // 返回主实现
-                return implMap.primary;
+                implClass = implMap.primary;
             } else {
                 // 没有主实现，检查实现数量
                 if (implMap.impls.size() == 1) {
                     // 只有一个实现，返回它
-                    return implMap.impls.values().iterator().next();
+                    implClass = implMap.impls.values().iterator().next();
                 } else {
                     // 多个实现，无法确定使用哪个，抛出异常
                     throw new ClassNoImplementation(
@@ -334,6 +375,7 @@ public final class Instance {
                     );
                 }
             }
+            return implClass;
         }
 
         private static final class ImplMap {

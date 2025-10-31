@@ -6,7 +6,7 @@ import org.maibot.core.db.dao.InteractionEntity;
 import org.maibot.core.db.dao.InteractionGroup;
 import org.maibot.core.db.dao.InteractionStream;
 import org.maibot.core.ioc.Instance;
-import org.maibot.core.util.TaskExecutorService;
+import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -37,15 +37,15 @@ public class ThinkingFlowManager implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(ThinkingFlowManager.class);
 
     /* 单例资源区 */
-    private final DatabaseService     databaseService;
-    private final TaskExecutorService taskExecutorService;
+    private final DatabaseService         databaseService;
+    private final TaskExecutorServiceImpl taskExecutorService;
 
     /* 运行资源区 */
     /// 当前所有交互流
     private final Map<String, ThinkingFlow> thinkingFlows = new ConcurrentHashMap<>();
 
     @AutoInject
-    private ThinkingFlowManager(DatabaseService databaseService, TaskExecutorService taskExecutorService) {
+    private ThinkingFlowManager(DatabaseService databaseService, TaskExecutorServiceImpl taskExecutorService) {
         this.databaseService = databaseService;
         this.taskExecutorService = taskExecutorService;
     }

@@ -7,7 +7,7 @@ import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.db.dao.DatabaseVersion;
 import org.maibot.core.util.ClassScanner;
-import org.maibot.core.util.TaskExecutorService;
+import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.NotInitialized;
@@ -33,14 +33,14 @@ public class DatabaseService implements DestroyableComponent {
     private static final Logger log         = LoggerFactory.getLogger(DatabaseService.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
-    private final TaskExecutorService taskExecutorService;
+    private final TaskExecutorServiceImpl taskExecutorService;
 
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
     DatabaseService(
       @Value("${local_data.database}") MainConfig.LocalData.Database conf,
-      TaskExecutorService taskExecutorService
+      TaskExecutorServiceImpl taskExecutorService
     ) {
         this.taskExecutorService = taskExecutorService;
         this.init(conf);

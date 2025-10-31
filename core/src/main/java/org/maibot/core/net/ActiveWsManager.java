@@ -8,6 +8,11 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 活动WebSocket连接管理器
+ * <p>
+ * 管理所有当前活动的WebSocket连接，确保每个路径只有一个活动连接。
+ */
 @Component
 public class ActiveWsManager {
     private static final Logger log = LoggerFactory.getLogger(ActiveWsManager.class);

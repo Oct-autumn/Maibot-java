@@ -8,15 +8,18 @@ import org.maibot.core.log.LogConfig;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.core.net.InnerServer;
 import org.maibot.core.thinking.ThinkingFlowManager;
-import org.maibot.core.util.TaskExecutorService;
+import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.core.util.TimerProxy;
+import org.maibot.sdk.TaskExecutorService;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.IgnorableException;
 import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("ClassCanBeRecord") // 抑制警告：可以转化为记录类
+@Component
 public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
@@ -72,9 +75,9 @@ public class Main {
         System.out.println("日志系统初始化完成");
         // <!-- 从此处开始可以正常使用Logger -->
 
-        // 初始化线程池
         Instance.get(TaskExecutorService.class);
         log.info("线程池初始化完成");
+        // <!-- 从此处开始可以正常使用线程池 -->
 
         log.info("注册关闭钩子...");
         Thread shutdownThread = new Thread(() -> {
@@ -114,15 +117,11 @@ public class Main {
               log.info("正在加载Mod...");
               this.modManager.loadMods();
 
-              // TODO: 初始化Mod管理器并进行模块加载
-
           }, "启动用时：{}ms"
         );
 
         // 启动终端
         log.info("正在启动终端...");
         this.terminalController.runCommandline();   // 阻塞调用，直到终端退出
-
-        this.terminalController.closeTerminal();
     }
 }

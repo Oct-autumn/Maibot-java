@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
+import org.maibot.core.ioc.Instance;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.net.WsProcessors;
@@ -66,7 +67,7 @@ public class WsRouteHandler extends WsRouter {
             for (var handler : processors.get(path).getHandlers()) {
                 ChannelHandler handlerInst;
                 try {
-                    handlerInst = (ChannelHandler) handler.getDeclaredConstructor().newInstance();
+                    handlerInst = (ChannelHandler) Instance.get(handler);
                 } catch (Exception e) {
                     log.error("无法实例化WS处理器: PATH: {}, Handler: {}", path, handler.getSimpleName(), e);
                     continue;

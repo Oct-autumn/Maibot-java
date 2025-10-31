@@ -1,48 +1,69 @@
 package org.maibot.core.ioc;
 
 
-import org.maibot.core.config.ConfigService;
-import org.maibot.core.util.ClassScanner;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassGraphException;
+import org.maibot.core.config.ConfigServiceImpl;
+import org.maibot.sdk.config.ConfigService;
 import org.maibot.sdk.exceptions.*;
 import org.maibot.sdk.ioc.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 public final class Instance {
-    private static final ImplManager                implManager       = new ImplManager();
-    private static final Map<Class<?>, Object>      singletons        = new ConcurrentHashMap<>();
-    private static final ThreadLocal<Set<Class<?>>> constructionStack = ThreadLocal.withInitial(HashSet::new);
+    /// 实现类管理器
+    private static final ImplManager                implManager        = new ImplManager();
+    /// 单例实例存储
+    private static final Map<Class<?>, Object>      singletons         = new ConcurrentHashMap<>();
+    /// 构造栈，检测循环依赖
+    private static final ThreadLocal<Set<Class<?>>> constructionStack  = ThreadLocal.withInitial(HashSet::new);
+    /// 单例实例记录队列，关闭时有序销毁
+    private static final Stack<Object>              singletonInstances = new Stack<>();
+
+    static {
+        // 加载核心组件配置
+        var configService = new ConfigServiceImpl();
+        configService.postConstruct();
+
+        singletons.put(ConfigServiceImpl.class, configService);
+    }
 
     /**
      * 扫描指定包下的实现类并注册
      *
      * @param basePackage 要扫描的基础包名
      */
-    public static void scanImplementations(String basePackage) {
+    public static void scanImplementations(String basePackage, ClassLoader classLoader) {
         Set<Class<?>> classes = new HashSet<>();
-        try {
+        var scanner = new ClassGraph().enableAllInfo().overrideClassLoaders(classLoader);
+        if (basePackage != null && !basePackage.isBlank()) {
+            scanner = scanner.acceptPackages(basePackage);
+        }
+
+        try (var scanResult = scanner.scan()) {
             // 扫描指定包下的所有类，找到带有 @Component 注解的实现类
-            classes.addAll(ClassScanner.fileScan(
-              basePackage, c -> {
-                  // 必须是Component、非接口、非抽象类
-                  return c.isAnnotationPresent(Component.class) && !c.isInterface() && !Modifier.isAbstract(c.getModifiers());
-              }
-            ));
-            classes.addAll(ClassScanner.jarScan(
-              Thread.currentThread().getContextClassLoader(), basePackage, c -> {
-                  // 必须是Component、非接口、非抽象类
-                  return c.isAnnotationPresent(Component.class) && !c.isInterface() && !Modifier.isAbstract(c.getModifiers());
-              }
-            ));
-        } catch (UnignorableException e) {
+            scanResult.getClassesWithAnnotation(Component.class.getName()).forEach(classInfo -> {
+                try {
+                    // 只注册非抽象类和非接口
+                    if (!Modifier.isAbstract(classInfo.getModifiers()) && !classInfo.isInterface()) {
+                        Class<?> clazz = Class.forName(classInfo.getName(), false, classLoader);
+                        classes.add(clazz);
+                    }
+                } catch (ClassNotFoundException e) {
+                    // 不应该发生，因为 ClassGraph 已经找到了这个类
+                    throw new FatalError(
+                      "Failed to load class %s during scanning. This shouldn't happen.",
+                      classInfo.getName(),
+                      e
+                    );
+                }
+            });
+        } catch (ClassGraphException e) {
             throw new FatalError("Failed to scan implementations in package '%s'", basePackage, e);
         }
 
@@ -86,9 +107,7 @@ public final class Instance {
 
         try {
             T instance = null;
-            if ((clazz.isAnnotationPresent(Component.class) && clazz.getAnnotation(Component.class)
-                                                                    .singleton()) || clazz.isAnnotationPresent(
-              ObjectFactory.class)) {
+            if ((clazz.isAnnotationPresent(Component.class) && clazz.getAnnotation(Component.class).singleton())) {
                 // 对于单例，使用线程安全的方式获取或创建实例
                 // 放入占位符（Future模式），防止CHM的循环更改
                 // 类似于数据库缓存击穿的加锁等待解决方案
@@ -98,7 +117,12 @@ public final class Instance {
                     // 当前线程负责创建实例
                     try {
                         instance = createInstance(clazz);
+                        if (instance instanceof InitializableComponent inst) {
+                            // 如果实现接口，执行后初始化方法
+                            inst.postConstruct();
+                        }
                         future.complete(instance); // 完成Future
+                        singletonInstances.push(instance); // 记录单例实例以便关闭时销毁
                         singletons.put(clazz, instance); // 替换占位符为实际实例
                     } catch (InstanceConstructException e) {
                         singletons.remove(clazz); // 创建失败，移除占位符
@@ -127,15 +151,15 @@ public final class Instance {
                 // 对于非单例，尝试自动注入
                 try {
                     instance = createInstance(clazz);
+                    if (instance instanceof InitializableComponent inst) {
+                        // 如果实现接口，执行后初始化方法
+                        inst.postConstruct();
+                    }
                 } catch (InstanceConstructException e) {
                     throw new InstanceConstructException("Failed to create instance of Class %s", clazz.getName(), e);
                 }
             }
 
-            // 如果实现接口，执行后初始化方法
-            if (instance instanceof InitializableComponent inst) {
-                inst.postConstruct();
-            }
             return instance;
         } finally {
             // 移除构造标记
@@ -278,9 +302,9 @@ public final class Instance {
     throws InvalidConfigPath {
         if (value.startsWith("${") && value.endsWith("}")) {
             // 符合格式的配置项，从配置文件中读取
-            var confMgr = Instance.getInst(ConfigService.class);
+            var confMgr = Instance.get(ConfigService.class);
             var path = value.substring(2, value.length() - 1);
-            return confMgr.getFromRaw(path, valueType);
+            return confMgr.getConfig(path, valueType);
         }
 
         try {
@@ -295,11 +319,17 @@ public final class Instance {
      * 关闭 IOC 容器，销毁所有实例
      */
     public static void close() {
-        singletons.values().forEach(instance -> {
-            if (instance instanceof DestroyableComponent inst) {
-                inst.preDestroy();
+        while (!singletonInstances.isEmpty()) {
+            var instance = singletonInstances.pop();
+            if (instance instanceof DestroyableComponent destroyable) {
+                try {
+                    destroyable.preDestroy();
+                } catch (Exception e) {
+                    // 忽略销毁时的异常
+                }
             }
-        });
+            singletons.remove(instance.getClass());
+        }
     }
 
     private static final class ImplManager {

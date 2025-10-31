@@ -2,7 +2,7 @@ package org.maibot.mods;
 
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.mod.Mod;
-import org.maibot.sdk.mod.ModInfo;
+import org.maibot.sdk.mod.ModMainClass;
 import org.maibot.sdk.net.HttpRouter;
 import org.maibot.sdk.net.WsProcessors;
 import org.maibot.sdk.net.WsRouter;
@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-@ModInfo(author = "Maibot Team", description = "Example Adapter Mod")
+@ModMainClass(author = "Maibot Team", description = "Example Adapter Mod")
 public class ExampleAdapterMod extends Mod {
     private static final Logger log = LoggerFactory.getLogger(ExampleAdapterMod.class);
 

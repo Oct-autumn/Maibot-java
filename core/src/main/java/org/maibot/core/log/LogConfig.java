@@ -32,10 +32,10 @@ public class LogConfig {
         rootLogger.detachAndStopAllAppenders(); // 清除现有的 appender
 
         rootLogger.addAppender(getTerminalAppender(context, conf.console));
-
-        if (AVAL_LEVELS.contains(conf.file.level.toUpperCase()) && !conf.file.level.equalsIgnoreCase("OFF")) {
+        
+        if (!conf.file.level.equals(Level.OFF)) {
             // 确保日志目录存在
-            java.io.File logDir = new java.io.File(conf.file.path);
+            java.io.File logDir = new java.io.File(conf.file.logDir);
             if (!logDir.exists() && logDir.mkdirs()) {
                 System.out.println("创建日志目录: " + logDir.getAbsolutePath());
             }
@@ -66,7 +66,7 @@ public class LogConfig {
         FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
         fileAppender.setName("file");
         fileAppender.setContext(context);
-        fileAppender.setFile(conf.path + "/maibot.log");
+        fileAppender.setFile(conf.logDir + "/maibot.log");
 
         {
             PatternLayoutEncoder fileEncoder = new PatternLayoutEncoder();
@@ -88,9 +88,9 @@ public class LogConfig {
         return fileAppender;
     }
 
-    private static CustomFilter createCustomFilter(String defaultLevel, List<String> rules) {
+    private static CustomFilter createCustomFilter(Level defaultLevel, List<String> rules) {
         CustomFilter filter = new CustomFilter();
-        filter.setDefaultLevel(Level.valueOf(defaultLevel));
+        filter.setDefaultLevel(defaultLevel);
         for (String rule : rules) {
             String[] parts = rule.split(":");
             String packageName = parts[0];

@@ -1,7 +1,10 @@
 package org.maibot.core.config;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.AllArgsConstructor;
+import ch.qos.logback.classic.Level;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
@@ -11,67 +14,67 @@ import java.util.List;
  * 请在配置项中使用包装类（如 Integer、Boolean）以支持 null 值
  * 请将字段设为final以防止意外修改
  */
-
-@SuppressWarnings({"unused", "ClassCanBeRecord"}) // 抑制警告：未使用、可以转化为记录类
-@AllArgsConstructor
+@SuppressWarnings("unused") // 抑制警告：未使用
+@NoArgsConstructor
 public final class MainConfig {
-    @SerializedName("log")
-    public final Log       log;
-    @SerializedName("network")
-    public final Network   network;
-    @SerializedName("local_data")
-    public final LocalData localData;
-    @SerializedName("thinking")
-    public final Thinking  thinking;
+    @JsonProperty(value = "log", required = true)
+    public Log       log;
+    @JsonProperty(value = "network", required = true)
+    public Network   network;
+    @JsonProperty(value = "local_data", required = true)
+    public LocalData localData;
+    @JsonProperty(value = "thinking", required = true)
+    public Thinking  thinking;
 
-    @AllArgsConstructor
+    @NoArgsConstructor
     public final static class Log {
-        public final ConsoleLogSettings console;
-        public final FileLogSettings    file;
+        @JsonProperty(value = "console", required = true)
+        public ConsoleLogSettings console;
+        @JsonProperty(value = "file", required = true)
+        public FileLogSettings    file;
 
-        @AllArgsConstructor
-        public static class FilterSettings {
-            public final String       level;
-            @SerializedName("filter_rule")
-            public final List<String> filterRule;
+        @NoArgsConstructor
+        public static final class ConsoleLogSettings {
+            @JsonProperty(value = "level", defaultValue = "INFO")
+            public Level        level;
+            @JsonProperty(value = "filter_rule")
+            public List<String> filterRule;
         }
 
-        public static final class ConsoleLogSettings extends FilterSettings {
-            public ConsoleLogSettings(String level, List<String> filterRule) {
-                super(level, filterRule);
-            }
-        }
-
-        public static final class FileLogSettings extends FilterSettings {
-            public final String path;
-
-            public FileLogSettings(String level, List<String> filterRule, String path) {
-                super(level, filterRule);
-                this.path = path;
-            }
+        @NoArgsConstructor
+        public static final class FileLogSettings {
+            @JsonProperty(value = "level", defaultValue = "INFO")
+            public Level        level;
+            @JsonProperty(value = "filter_rule")
+            public List<String> filterRule;
+            @JsonProperty(value = "log_dir", defaultValue = "logs")
+            public String       logDir;
         }
     }
 
-    @AllArgsConstructor
+    @NoArgsConstructor
     public static final class Network {
-        public final String  host;
-        public final Integer port;
+        @JsonProperty(value = "host", defaultValue = "127.0.0.1")
+        public String  host;
+        @JsonProperty(value = "port", defaultValue = "8080")
+        public Integer port;
     }
 
-    @AllArgsConstructor
+    @NoArgsConstructor
     public static final class LocalData {
-        public final Database database;
+        @JsonProperty(value = "database", required = true)
+        public Database database;
 
-        @AllArgsConstructor
+        @NoArgsConstructor
         public static class Database {
-            @SerializedName("sqlite_path")
-            public final String sqlitePath;
+            @JsonProperty(value = "sqlite_path", defaultValue = "data/maibot.db")
+            public String sqlitePath;
         }
     }
 
-    @AllArgsConstructor
+    @NoArgsConstructor
     public static final class Thinking {
-        @SerializedName("observation_window_size")
-        public final Integer observationWindowSize;
+        @JsonProperty(value = "observation_window_size", defaultValue = "20")
+        public Integer observationWindowSize;
     }
 }

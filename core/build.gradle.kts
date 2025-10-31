@@ -27,12 +27,18 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("ch.qos.logback:logback-classic:1.5.19")
 
-    // TOML for configuration
-    implementation("io.hotmoka:toml4j:0.7.3")
+    // Jackson for configuration
+    implementation("tools.jackson.core:jackson-databind:3.0.1")
+    implementation("tools.jackson.dataformat:jackson-dataformat-toml:3.0.1")
+    implementation("tools.jackson.dataformat:jackson-dataformat-yaml:3.0.1")
+    implementation("tools.jackson.dataformat:jackson-dataformat-properties:3.0.1")
 
     // Lombok for reducing boilerplate code
     compileOnly("org.projectlombok:lombok:1.18.42")
     annotationProcessor("org.projectlombok:lombok:1.18.42")
+
+    // ClassGraph for runtime classpath scanning
+    implementation("io.github.classgraph:classgraph:4.8.184")
 
     // SQLite and Hibernate for database access
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")

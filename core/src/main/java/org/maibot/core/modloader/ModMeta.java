@@ -1,47 +1,33 @@
 package org.maibot.core.modloader;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-@SuppressWarnings("ClassCanBeRecord")
+@SuppressWarnings("unused") // 抑制警告：未使用
+@NoArgsConstructor
 public class ModMeta {
-    @SerializedName("mod_id")
-    public final String              modId;
-    @SerializedName("version")
-    public final String              version;
-    @SerializedName("main_class")
-    public final String              mainClass;
-    @SerializedName("sdk_version")
-    public final String              sdkVersion;
-    public final List<ModDependency> dependencies;
+    @JsonProperty(value = "mod_id", required = true)
+    public String              modId;
+    @JsonProperty(value = "version", required = true)
+    public String              version;
+    @JsonProperty(value = "package_name", required = true)
+    public String              packageName;
+    @JsonProperty(value = "main_class", required = true)
+    public String              mainClass;
+    @JsonProperty(value = "sdk_version", required = true)
+    public String              sdkVersion;
+    @JsonProperty("dependencies")
+    public List<ModDependency> dependencies;
 
-    public ModMeta(
-      String modId,
-      String version,
-      String mainClass,
-      String sdkVersion,
-      List<ModDependency> dependencies
-    ) {
-        this.modId = modId;
-        this.version = version;
-        this.mainClass = mainClass;
-        this.sdkVersion = sdkVersion;
-        this.dependencies = dependencies;
-    }
-
+    @NoArgsConstructor
     public static class ModDependency {
-        @SerializedName("mod_id")
-        public final String  modId;
-        @SerializedName("version")
-        public final String  version;
-        @SerializedName("mandatory")
-        public final boolean mandatory;
-
-        public ModDependency(String modId, String version, boolean mandatory) {
-            this.modId = modId;
-            this.version = version;
-            this.mandatory = mandatory;
-        }
+        @JsonProperty(value = "mod_id", required = true)
+        public String  modId;
+        @JsonProperty(value = "version", required = true)
+        public String  version;
+        @JsonProperty(value = "mandatory", required = true)
+        public boolean mandatory;
     }
 }

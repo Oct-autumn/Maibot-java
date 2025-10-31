@@ -33,10 +33,11 @@ class ModProperties {
         // You should change this to your mod's version.
         const val MOD_VERSION = "0.1.0-Alpha"
 
-        // Mod Main Class
-        // The fully qualified name of the main class of this mod.
-        // You should change this to your mod's main class.
-        const val MOD_MAIN_CLASS = "org.maibot.mods.ExampleAdapterMod"
+        // Mod Package Name
+        // The root package name for this mod.
+        // For example, if your mod's file are under "org.example.mymod", set this to "org.example.mymod".
+        // You should change this to your mod's package name.
+        const val MOD_PACKAGE_NAME = "org.maibot.mods"
 
         // SDK Version
         // The version range of the SDK that this mod qualified.
@@ -106,7 +107,7 @@ tasks.register("createModToml") {
         if (ModProperties.MOD_VERSION.isEmpty()) {
             throw IllegalArgumentException("Mod Version cannot be null or empty")
         }
-        if (ModProperties.MOD_MAIN_CLASS.isEmpty()) {
+        if (ModProperties.MOD_PACKAGE_NAME.isEmpty()) {
             throw IllegalArgumentException("Mod Main Class cannot be null or empty")
         }
         if (ModProperties.MOD_SDK_VERSION.isEmpty()) {
@@ -121,7 +122,7 @@ tasks.register("createModToml") {
         var modTomlContent = """
             mod_id = "${ModProperties.MOD_ID}"
             version = "$innerVersion"
-            main_class = "${ModProperties.MOD_MAIN_CLASS}"
+            package_name = "${ModProperties.MOD_PACKAGE_NAME}"
             sdk_version = "${ModProperties.MOD_SDK_VERSION}"
             license = "${ModProperties.MOD_LICENSE}"
             url = "${ModProperties.MOD_URL}"

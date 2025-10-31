@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
  * 用于标注一个类为IoC容器的组件
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 public @interface Component {
     /// 是否为单例组件，默认为true
     boolean singleton() default true;

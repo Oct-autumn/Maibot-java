@@ -2,15 +2,15 @@ package org.maibot.core;
 
 import org.maibot.core.commandline.TerminalController;
 import org.maibot.core.config.BuildInfo;
-import org.maibot.core.config.ConfigService;
+import org.maibot.core.config.MainConfig;
 import org.maibot.core.ioc.Instance;
 import org.maibot.core.log.LogConfig;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.core.net.InnerServer;
 import org.maibot.core.thinking.ThinkingFlowManager;
-import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.core.util.TimerProxy;
 import org.maibot.sdk.TaskExecutorService;
+import org.maibot.sdk.config.ConfigService;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.IgnorableException;
 import org.maibot.sdk.ioc.AutoInject;
@@ -56,7 +56,7 @@ public class Main {
 
         Thread.currentThread().setName("Main");
 
-        Instance.scanImplementations("org.maibot");
+        Instance.scanImplementations("org.maibot", Thread.currentThread().getContextClassLoader());
 
         var buildInfo = Instance.get(BuildInfo.class);
         System.out.print("""
@@ -70,8 +70,8 @@ public class Main {
         System.out.printf("> Build Time: %s (UTC) <\n", buildInfo.getBuildTime());
         System.out.printf("> SDK Version: %s <\n", buildInfo.sdkVersion().getVersion());
 
-        var configManager = Instance.get(ConfigService.class);
-        LogConfig.configure(configManager.get().log);
+        var configService = Instance.get(ConfigService.class);
+        LogConfig.configure(configService.getConfig("log", MainConfig.Log.class));
         System.out.println("日志系统初始化完成");
         // <!-- 从此处开始可以正常使用Logger -->
 

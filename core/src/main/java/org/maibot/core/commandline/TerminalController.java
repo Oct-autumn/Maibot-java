@@ -1,21 +1,25 @@
 package org.maibot.core.commandline;
 
 import lombok.Setter;
+import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.impl.LineReaderImpl;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.maibot.core.log.LogConfig;
 import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.DestroyableComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.shell.jline3.PicocliJLineCompleter;
 
 import java.io.IOException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
-public class TerminalController {
+public class TerminalController implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(TerminalController.class);
 
     private final Terminal terminal;
@@ -44,8 +48,13 @@ public class TerminalController {
         this.running = true;
         LogConfig.setTerminalLineReader(this.reader);
         while (this.running) {
-            String line = this.reader.readLine(this.prompt);
-            cmd.execute(line.split("\\s+"));
+            try {
+                String line = this.reader.readLine(this.prompt);
+                cmd.execute(line.split("\\s+"));
+            } catch (EndOfFileException e) {
+                log.warn("无法读取终端输入，正在退出命令行");
+                break;
+            }
         }
     }
 
@@ -53,9 +62,6 @@ public class TerminalController {
      * 停止终端（当前
      */
     public void stopCommandline() {
-        if (!this.running) {
-            return;
-        }
         this.running = false;
         LogConfig.setTerminalLineReader(null);
     }
@@ -66,5 +72,10 @@ public class TerminalController {
         } catch (IOException e) {
             log.error("关闭终端时发生错误", e);
         }
+    }
+
+    @Override
+    public void preDestroy() {
+        stopCommandline();
     }
 }

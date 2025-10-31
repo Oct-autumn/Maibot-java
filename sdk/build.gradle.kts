@@ -29,6 +29,9 @@ dependencies {
     // Netty for networking
     implementation("io.netty:netty-all:4.2.6.Final")
 
+    // Jackson for JSON parsing
+    implementation("tools.jackson.core:jackson-databind:3.0.1")
+
     // Lombok for reducing boilerplate code
     compileOnly("org.projectlombok:lombok:1.18.42")
     annotationProcessor("org.projectlombok:lombok:1.18.42")

@@ -1,16 +1,22 @@
 package org.maibot.core.modloader;
 
-import com.moandjiezana.toml.Toml;
+import io.github.classgraph.ClassGraph;
 import org.maibot.core.config.BuildInfo;
+import org.maibot.core.config.ConfigServiceImpl;
 import org.maibot.core.ioc.Instance;
+import org.maibot.sdk.config.Configuration;
+import org.maibot.sdk.exceptions.ClassNoImplementation;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.exceptions.InstanceConstructException;
 import org.maibot.sdk.exceptions.UnignorableException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.ioc.DestroyableComponent;
 import org.maibot.sdk.mod.Mod;
+import org.maibot.sdk.mod.ModMainClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.dataformat.toml.TomlMapper;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,10 +24,10 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.jar.JarFile;
 
 @Component
 public class ModManager implements DestroyableComponent {
@@ -29,13 +35,15 @@ public class ModManager implements DestroyableComponent {
     private static final String MODS_DIRECTORY = "mods";
     private static final String MOD_META_PATH  = "META-INF/mod.toml";
 
-    private final BuildInfo buildInfo;
+    private final BuildInfo         buildInfo;
+    private final ConfigServiceImpl configService;
 
     private final Map<String, Mod> loadedMods = new ConcurrentHashMap<>();
 
     @AutoInject
-    private ModManager(BuildInfo buildInfo) {
+    private ModManager(BuildInfo buildInfo, ConfigServiceImpl configService) {
         this.buildInfo = buildInfo;
+        this.configService = configService;
     }
 
     /**
@@ -44,21 +52,14 @@ public class ModManager implements DestroyableComponent {
      * @return Mod元数据对象
      * @throws UnignorableException 如果读取或解析失败
      */
-    private static ModMeta readModMeta(JarFile modJar)
+    private static ModMeta readModMeta(InputStream inputStream)
     throws UnignorableException {
-        try (InputStream is = modJar.getInputStream(modJar.getJarEntry(MOD_META_PATH))) {
-            if (is == null) {
-                throw new UnignorableException("Mod JAR does not contain %s", MOD_META_PATH);
-            }
-
-            Toml metaToml = new Toml().read(is);
-
-            // 考虑到Mod开发时构建脚本中提供了完善的校验，这里不再进行冗余的字段检查
-
-            return metaToml.to(ModMeta.class);
-        } catch (IOException e) {
-            throw new UnignorableException("Failed to read mod metadata from %s", modJar.getName(), e);
+        if (inputStream == null) {
+            throw new UnignorableException("Mod JAR does not contain %s", MOD_META_PATH);
         }
+
+        var tomlMapper = new TomlMapper();
+        return tomlMapper.readValue(inputStream, ModMeta.class);
     }
 
     /**
@@ -88,10 +89,12 @@ public class ModManager implements DestroyableComponent {
         }
 
         log.debug("找到 {} 个Mod文件，正在预载元数据...", files.length);
-        var dependencyTree = this.preLoadModMeta(files);
+        var dependencyTree = this.preLoadMod(files);
+
+        // TODO: 搜索Mod中的Class，应用IoC托管
 
         log.debug("载入Mod实例...");
-        this.getModInstances(files, dependencyTree);
+        this.getModInstances(dependencyTree);
         log.info("Mod加载完成，共成功加载 {} 个Mod", loadedMods.size());
     }
 
@@ -101,39 +104,96 @@ public class ModManager implements DestroyableComponent {
      * @param modFiles Mod文件列表
      * @return 依赖关系树
      */
-    private DependencyTree preLoadModMeta(File[] modFiles) {
-        DependencyTree tree = new DependencyTree(this.buildInfo.sdkVersion());
+    private ModDependencyTree preLoadMod(File[] modFiles) {
+        ModDependencyTree tree = new ModDependencyTree(this.buildInfo.sdkVersion());
+
+        boolean needReboot = false;
 
         for (var file : modFiles) {
-            String modId = null;
-            try (JarFile jar = new JarFile(file)) {
-                var metaData = readModMeta(jar);
+            URL url;
+            try {
+                url = file.toURI().toURL();
+            } catch (MalformedURLException e) {
+                // 不应该发生的错误，因为文件路径一定是本地文件系统的合法路径
+                // 但为了安全起见，还是捕获一下
+                log.warn("Mod文件路径无效: {}", file.getAbsolutePath(), e);
+                continue;
+            }
 
+            String modId = null;
+
+            // 建立URLClassLoader以读取mod.toml以及配置文件模板
+            // 这里不实例化ModClass，因此父ClassLoader设为null，避免类冲突
+            try (var urlClassLoader = new URLClassLoader(new URL[]{url}, null)) {
+                var metaData = readModMeta(urlClassLoader.getResourceAsStream(MOD_META_PATH));
                 modId = metaData.modId;
 
-                tree.addMod(metaData.modId, metaData.version, metaData.mainClass);
+                try (var scanResult = new ClassGraph().overrideClassLoaders(urlClassLoader)
+                                                      .acceptPackages(metaData.packageName)
+                                                      .enableAllInfo()
+                                                      .scan()) {
+                    var mainClassList = scanResult.getClassesWithAnnotation(ModMainClass.class.getName());
+                    if (mainClassList.size() != 1) {
+                        throw new UnignorableException(
+                          "Mod '%s' must have exactly one class annotated with @ModMainClass.",
+                          file.getName()
+                        );
+                    }
+                    var mainClass = mainClassList.getFirst().getName();
 
-                tree.addDependency(
-                  metaData.modId,
-                  "sdk",
-                  metaData.sdkVersion,
-                  true
-                );
+                    var modConfigClassList = scanResult.getClassesWithAnnotation(Configuration.class.getName());
+                    if (modConfigClassList.size() > 1) {
+                        throw new UnignorableException(
+                          "Mod '%s' can have at most one class annotated with @Configuration.",
+                          file.getName()
+                        );
+                    }
+                    if (modConfigClassList.size() == 1) {
+                        var configClass = Class.forName(modConfigClassList.getFirst().getName(), false, urlClassLoader);
+                        try (var templateStream = urlClassLoader.getResourceAsStream(ConfigServiceImpl.MOD_CONFIG_TEMPLATE_FILE)) {
+                            var loadSuccess = this.configService.loadExtraConfig(
+                              metaData.modId,
+                              configClass,
+                              Path.of(ConfigServiceImpl.CONFIG_DIR, metaData.modId + ".toml").toString(),
+                              templateStream
+                            );
+                            if (loadSuccess) {
+                                log.debug("Mod {} 的配置文件加载成功", metaData.modId);
+                            } else {
+                                log.warn(
+                                  "Mod {} 的配置文件不存在，已创建默认配置文件，请根据需要修改后重新启动程序。",
+                                  metaData.modId
+                                );
+                                needReboot = true;
+                            }
+                        }
+                    }
+
+                    tree.addMod(metaData.modId, metaData.version, mainClass, url);
+                } catch (ClassNotFoundException e) {
+                    // 不应该发生的错误，因为类名是从扫描结果中获取的
+                    throw new UnignorableException("Mod class not found during metadata pre-loading.", e);
+                }
+
+
+                tree.addDependency(metaData.modId, "sdk", metaData.sdkVersion, true);
 
                 if (metaData.dependencies != null) {
                     for (var dep : metaData.dependencies) {
-                        tree.addDependency(
-                          metaData.modId,
-                          dep.modId,
-                          dep.version,
-                          dep.mandatory
-                        );
+                        tree.addDependency(metaData.modId, dep.modId, dep.version, dep.mandatory);
                     }
                 }
-            } catch (IOException | SecurityException | UnignorableException e) {
-                log.error("加载Mod文件 {} 时发生错误", file.getName(), e);
-                if (modId != null) tree.removeMod(modId);   // 移除已添加的Mod节点
+            } catch (IOException | UnignorableException e) {
+                log.error("读取Mod文件 {} 时发生错误", file.getName(), e);
+                if (modId != null) {
+                    configService.removeConfigNameSpace(modId);
+                    tree.removeMod(modId);
+                }
             }
+        }
+
+        if (needReboot) {
+            throw new FatalError("One or more mod configuration files were created. Please restart the application.");
         }
 
         return tree;
@@ -142,44 +202,51 @@ public class ModManager implements DestroyableComponent {
     /**
      * 根据依赖关系树加载Mod实例
      *
-     * @param modFiles Mod文件列表
-     * @param tree     依赖关系树
+     * @param tree 依赖关系树
      */
-    private void getModInstances(File[] modFiles, DependencyTree tree) {
-        Queue<String> loadOrder;
+    private void getModInstances(ModDependencyTree tree) {
+        Queue<ModDependencyTree.MetaNode> loadOrder;
 
         loadOrder = tree.resolveLoadOrder();
 
-        URL[] modUrls = new URL[modFiles.length];
-        for (int i = 0; i < modFiles.length; i++) {
-            try {
-                modUrls[i] = modFiles[i].toURI().toURL();
-            } catch (MalformedURLException e) {
-                throw new FatalError("Malformed URL for mod file: %s", modFiles[i].getName(), e);
-            }
-        }
+        // 收集所有Mod的URL
+        URL[] modUrls = loadOrder.stream()
+                                 .filter(item -> !item.modId().equals("sdk"))
+                                 .map(ModDependencyTree.MetaNode::modFileUrl)
+                                 .toArray(URL[]::new);
 
         // TODO: 拆分ClassLoader，避免Mod间类冲突
-        try (URLClassLoader modClassLoader = new URLClassLoader(modUrls, this.getClass().getClassLoader())) {
-            for (String instruct : loadOrder) {
-                String[] parts = instruct.split(":");
-                if (parts[0].equals("sdk")) continue; // 跳过SDK节点
+        {
+            try (URLClassLoader modClassLoader = new URLClassLoader(modUrls, this.getClass().getClassLoader())) {
+                Instance.scanImplementations("", modClassLoader);
 
-                Class<?> modClazz = Class.forName(parts[1], true, modClassLoader);
-                Object modInstance = Instance.get(modClazz);
+                for (ModDependencyTree.MetaNode node : loadOrder) {
+                    if (node.modId().equals("sdk")) continue; // 跳过SDK节点
 
-                if (modInstance instanceof Mod mod) {
-                    mod.onLoad();
-                    loadedMods.put(parts[0], mod);
-                    log.debug("成功加载Mod: {}", parts[0]);
-                } else {
-                    log.error("Mod主类 {} 未实现 Mod 接口，跳过加载", instruct);
+                    try {
+                        Class<?> modClazz = Class.forName(node.mainClass(), true, modClassLoader);
+                        Object modInstance = Instance.get(modClazz);
+                        if (modInstance instanceof Mod mod) {
+                            mod.onLoad();
+                            loadedMods.put(node.modId(), mod);
+                            log.debug("成功加载Mod: {}", node.modId());
+                        } else {
+                            log.error("Mod主类 {} 未实现 Mod 接口，跳过加载", node.mainClass());
+                            configService.removeConfigNameSpace(node.modId());
+                        }
+                    } catch (ClassNotFoundException e) {
+                        // 不应该发生的错误，因为类名是从扫描结果中获取的
+                        throw new FatalError("Mod main class not found: %s", node.mainClass(), e);
+                    } catch (InstanceConstructException e) {
+                        throw new FatalError("Failed to construct mod instance.", e);
+                    } catch (Throwable e) {
+                        throw new FatalError("Unexpected exception when getting mod instances." + node.modId(), e);
+                    }
                 }
+            } catch (IOException e) {
+                // 不应该发生的错误，因为URL是通过文件路径转换而来，均为合法URL
+                throw new FatalError("Unexpected exception when getting mod instances.", e);
             }
-        } catch (ClassNotFoundException e) {
-            throw new FatalError("Mod main class not found during loading.", e);
-        } catch (SecurityException | NullPointerException | IOException e) {
-            throw new FatalError("Unexpected exception when getting mod instances.", e);
         }
     }
 
@@ -189,7 +256,7 @@ public class ModManager implements DestroyableComponent {
             try {
                 mod.onUnload();
             } catch (Throwable e) {
-                log.error("卸载Mod {} 时发生异常: {}", mod.getClass().getName(), e.getMessage(), e);
+                log.error("卸载Mod {} 时发生异常", mod.getClass().getName(), e);
             }
         });
     }

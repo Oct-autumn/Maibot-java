@@ -6,28 +6,30 @@ import org.maibot.sdk.exceptions.DependencyNotExist;
 import org.maibot.sdk.exceptions.DuplicateMod;
 import org.semver4j.Semver;
 
+import java.net.URL;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public class DependencyTree {
+public class ModDependencyTree {
     private final Map<String, MetaNode> nodes = new HashMap<>();
 
-    public DependencyTree(Semver sdkVersion) {
+    public ModDependencyTree(Semver sdkVersion) {
         nodes.put(
           "sdk", new MetaNode(
             "sdk",
             sdkVersion,
-            ""
+            null,
+            null
           )
         );
     }
 
-    public void addMod(String modId, String version, String mainClass)
+    public void addMod(String modId, String version, String mainClass, URL modFileUrl)
     throws DuplicateMod {
         if (nodes.containsKey(modId)) {
             throw new DuplicateMod("Duplicate mod detected: %s", modId);
         }
-        MetaNode metaNode = new MetaNode(modId, new Semver(version), mainClass);
+        MetaNode metaNode = new MetaNode(modId, new Semver(version), mainClass, modFileUrl);
         nodes.put(modId, metaNode);
     }
 
@@ -123,7 +125,7 @@ public class DependencyTree {
      * @return 加载顺序的Mod ID队列
      * @throws CircularDependence 如果存在循环依赖则抛出异常
      */
-    public Queue<String> resolveLoadOrder()
+    public Queue<MetaNode> resolveLoadOrder()
     throws CircularDependence {
         // Kahn算法实现拓扑排序，检测循环依赖
         Map<String, Integer> inDegree = new HashMap<>();
@@ -133,7 +135,7 @@ public class DependencyTree {
             }
         }
 
-        Queue<String> loadOrder = new LinkedList<>();
+        Queue<MetaNode> loadOrder = new LinkedList<>();
         Queue<String> zeroInDegreeQueue = new LinkedList<>();
 
         for (var nodeEntry : nodes.entrySet()) {
@@ -144,7 +146,7 @@ public class DependencyTree {
 
         while (!zeroInDegreeQueue.isEmpty()) {
             String modId = zeroInDegreeQueue.poll();
-            loadOrder.add(modId + ":" + this.nodes.get(modId).mainClass());
+            loadOrder.add(nodes.get(modId));
 
             for (var dep : nodes.get(modId).dependencies()) {
                 String depId = dep.modId();
@@ -157,7 +159,7 @@ public class DependencyTree {
 
         if (loadOrder.size() != nodes.size()) {
             Set<String> remainingNodes = new HashSet<>(nodes.keySet());
-            loadOrder.forEach(remainingNodes::remove);
+            loadOrder.forEach(item -> remainingNodes.remove(item.modId()));
             throw new CircularDependence(
               "Circular dependency detected among mods: %s",
               String.join(", ", remainingNodes)
@@ -167,17 +169,33 @@ public class DependencyTree {
         return loadOrder;
     }
 
-    static class MetaNode {
+    public static class MetaNode {
         private final String modId;
         private final Semver version;
         private final String mainClass;
+        private final URL    modFileUrl;
 
         private final List<MetaNode> dependencies = new ArrayList<>();
 
-        public MetaNode(@NonNull String modId, @NonNull Semver version, @NonNull String mainClass) {
+        public MetaNode(
+          @NonNull String modId,
+          @NonNull Semver version,
+          String mainClass,
+          URL modFileUrl
+        ) {
             this.modId = modId;
             this.version = version;
             this.mainClass = mainClass;
+            this.modFileUrl = modFileUrl;
+            if (!modId.equals("sdk")) {
+                if (mainClass == null) {
+                    throw new NullPointerException("mainClass");
+                }
+                if (modFileUrl == null) {
+                    throw new NullPointerException("modFileUrl");
+                }
+            }
+
         }
 
         public String modId() {
@@ -192,11 +210,15 @@ public class DependencyTree {
             return mainClass;
         }
 
+        public URL modFileUrl() {
+            return modFileUrl;
+        }
+
         public List<MetaNode> dependencies() {
             return dependencies;
         }
 
-        public void addDependency(@NonNull DependencyTree.MetaNode metaNode) {
+        public void addDependency(@NonNull ModDependencyTree.MetaNode metaNode) {
             this.dependencies.add(metaNode);
         }
     }

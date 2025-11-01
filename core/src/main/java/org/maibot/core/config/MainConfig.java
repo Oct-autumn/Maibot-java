@@ -27,43 +27,44 @@ public record MainConfig(
 ) {
     public record BotInfo(
       @JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "aliases", defaultValue = "[]") List<String> aliases
+      @JsonProperty(value = "aliases", required = true) List<String> aliases
     ) {
     }
 
     public record Log(
       @JsonProperty(value = "console", required = true) ConsoleLogSettings console,
-      @JsonProperty(value = "file", required = true) FileLogSettings file
+      @JsonProperty(value = "file", required = true) FileLogSettings file,
+      @JsonProperty(value = "enable_mdc_track", required = true) Boolean enableMdcTrack
     ) {
         public record ConsoleLogSettings(
-          @JsonProperty(value = "level", defaultValue = "INFO") String level,
-          @JsonProperty(value = "filter_rule", defaultValue = "[]") List<String> filterRule
+          @JsonProperty(value = "level", required = true) String level,
+          @JsonProperty(value = "filter_rule", required = true) List<String> filterRule
         ) {
         }
 
         public record FileLogSettings(
-          @JsonProperty(value = "level", defaultValue = "INFO") String level,
-          @JsonProperty(value = "filter_rule", defaultValue = "[]") List<String> filterRule,
-          @JsonProperty(value = "log_dir", defaultValue = "logs") String logDir
+          @JsonProperty(value = "level", required = true) String level,
+          @JsonProperty(value = "filter_rule", required = true) List<String> filterRule,
+          @JsonProperty(value = "log_dir", required = true) String logDir
         ) {
         }
     }
 
     public record Network(
-      @JsonProperty(value = "host", defaultValue = "127.0.0.1") String host,
+      @JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) Integer port
     ) {
     }
 
     public record LocalData(@JsonProperty(value = "database", required = true) Database database) {
         public record Database(
-          @JsonProperty(value = "sqlite_path", defaultValue = "data/maibot.db") String sqlitePath
+          @JsonProperty(value = "sqlite_path", required = true) String sqlitePath
         ) {
         }
     }
 
     public record Thinking(
-      @JsonProperty(value = "observation_window_size", defaultValue = "20") Integer observationWindowSize
+      @JsonProperty(value = "observation_window_size", required = true) Integer observationWindowSize
     ) {
     }
 }

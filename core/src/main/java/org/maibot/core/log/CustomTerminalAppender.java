@@ -4,6 +4,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import lombok.Setter;
 import org.jline.reader.LineReader;
+import org.maibot.sdk.ioc.AutoInject;
+import org.maibot.sdk.ioc.Value;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -13,11 +15,19 @@ import java.util.StringJoiner;
 import java.util.stream.Stream;
 
 public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss");
 
-    private static final String LOG_TEMPLATE       = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ {7} - @{{3} {6}}@\n{8}";
-    private static final String MDC_TEMPLATE       = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
-    private static final String THROWABLE_TEMPLATE = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
+    private static final String LOG_TEMPLATE          = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@:\n\t@{{3} {6}}@\n{7}";
+    private static final String LOG_TEMPLATE_WITH_MDC = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ {6}:\n\t@{{3} {7}}@\n{8}";
+    private static final String MDC_TEMPLATE          = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
+    private static final String THROWABLE_TEMPLATE    = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
+
+    private final boolean enableMdcTrack;
+
+    @AutoInject
+    public CustomTerminalAppender(@Value("${log.enable_mdc_track}") boolean enableMdcTrack) {
+        this.enableMdcTrack = enableMdcTrack;
+    }
 
     @Setter
     private LineReader lineReader;
@@ -46,17 +56,31 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
             default -> "FG_DEFAULT";
         };
 
-        return AnsiFormatter.render(
-          LOG_TEMPLATE,
-          DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
-          event.getThreadName(),
-          levelColor,
-          String.format("%-5s", event.getLevel()),
-          compressLoggerName(event.getLoggerName(), 30),
-          event.getFormattedMessage(),
-          renderMDC(event),
-          renderThrowable(event)
-        );
+        if (enableMdcTrack) {
+            return AnsiFormatter.render(
+              LOG_TEMPLATE_WITH_MDC,
+              DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
+              event.getThreadName(),
+              levelColor,
+              String.format("%-5s", event.getLevel()),
+              compressLoggerName(event.getLoggerName(), 30),
+              renderMDC(event),
+              event.getFormattedMessage(),
+              renderThrowable(event)
+            );
+        } else {
+            return AnsiFormatter.render(
+              LOG_TEMPLATE,
+              DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
+              event.getThreadName(),
+              levelColor,
+              String.format("%-5s", event.getLevel()),
+              compressLoggerName(event.getLoggerName(), 30),
+              event.getFormattedMessage(),
+              renderThrowable(event)
+            );
+        }
+
     }
 
     /**

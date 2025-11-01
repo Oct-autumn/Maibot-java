@@ -8,6 +8,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 import org.jline.reader.LineReader;
 import org.maibot.core.config.MainConfig;
+import org.maibot.core.ioc.Instance;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
@@ -57,7 +58,7 @@ public class LogConfig {
       LoggerContext context,
       MainConfig.Log.ConsoleLogSettings conf
     ) {
-        var terminalAppender = new CustomTerminalAppender();
+        var terminalAppender = Instance.get(CustomTerminalAppender.class);
         terminalAppender.setName("terminal");
         terminalAppender.setContext(context);
 

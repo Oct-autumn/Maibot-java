@@ -12,95 +12,18 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 public final class Instance {
     /// 实现类管理器
-    private static final ImplManager                implManager        = new ImplManager();
-    /// 单例实例存储
-    private static final Map<Class<?>, Object>      singletons         = new ConcurrentHashMap<>();
+    private static final ImplManager                implManager       = new ImplManager();
+    /// 单例实例管理器
+    private static final SingletonManager           singletonManager  = new SingletonManager();
     /// 构造栈，检测循环依赖
-    private static final ThreadLocal<Set<Class<?>>> constructionStack  = ThreadLocal.withInitial(HashSet::new);
-    /// 单例实例记录队列，关闭时有序销毁
-    private static final Stack<Object>              singletonInstances = new Stack<>();
+    private static final ThreadLocal<Set<Class<?>>> constructionStack = ThreadLocal.withInitial(HashSet::new);
 
-    static {
-        // 加载核心组件配置
-        var configService = new ConfigServiceImpl();
-        configService.postConstruct();
-
-        singletons.put(ConfigServiceImpl.class, configService);
-    }
-
-    /**
-     * 扫描指定包下的实现类并注册
-     *
-     * @param basePackage 要扫描的基础包名
-     */
     public static void scanImplementations(String basePackage, ClassLoader classLoader) {
-        Set<Class<?>> classes = new HashSet<>();
-        var scanner = new ClassGraph().enableAllInfo().overrideClassLoaders(classLoader);
-        if (basePackage != null && !basePackage.isBlank()) {
-            scanner = scanner.acceptPackages(basePackage);
-        }
-
-        try (var scanResult = scanner.scan()) {
-            // 扫描指定包下的所有类，找到带有 @Component 注解的实现类
-            scanResult.getClassesWithAnnotation(Component.class).forEach(classInfo -> {
-                try {
-                    // 只注册非抽象类和非接口
-                    if (!Modifier.isAbstract(classInfo.getModifiers()) && !classInfo.isInterface()) {
-                        Class<?> clazz = Class.forName(classInfo.getName(), false, classLoader);
-                        classes.add(clazz);
-                    }
-                } catch (ClassNotFoundException e) {
-                    // 不应该发生，因为 ClassGraph 已经找到了这个类
-                    throw new FatalError(
-                      "Failed to load class %s during scanning. This shouldn't happen.",
-                      classInfo.getName(),
-                      e
-                    );
-                }
-            });
-        } catch (ClassGraphException e) {
-            throw new FatalError("Failed to scan implementations in package '%s'", basePackage, e);
-        }
-
-        for (Class<?> clazz : classes) {
-            // 获取组件名称
-            var anno = clazz.getAnnotation(Component.class);
-            if (anno == null) {
-                // 说明@Component作为元注解使用，获取实际注解
-                anno = Arrays.stream(clazz.getAnnotations())
-                             .map(a -> a.annotationType().getAnnotation(Component.class))
-                             .filter(Objects::nonNull)
-                             .findFirst()
-                             .orElseThrow(
-                               // 理论上不会发生，因为前面已经通过ClassGraph筛选过了
-                               () -> new FatalError(
-                                 "Component annotation not found on class %s during registration. This shouldn't happen.",
-                                 clazz.getName()
-                               )
-                             );
-            }
-
-            String name = anno.name();
-            if (name.isBlank()) {
-                name = clazz.getSimpleName();
-            }
-
-            // 注册类及其所有接口的实现
-            implManager.putImpl(clazz, name, clazz, anno.primaryImpl());
-
-            for (Class<?> iface : clazz.getInterfaces()) {
-                implManager.putImpl(iface, name, clazz, anno.primaryImpl());
-            }
-
-            for (Class<?> superClass = clazz.getSuperclass(); superClass != null && superClass != Object.class; superClass = superClass.getSuperclass()) {
-                implManager.putImpl(superClass, name, clazz, anno.primaryImpl());
-            }
-        }
+        implManager.scanImplementations(basePackage, classLoader);
     }
 
     /**
@@ -123,47 +46,9 @@ public final class Instance {
         stack.add(clazz);
 
         try {
-            T instance = null;
+            T instance;
             if ((clazz.isAnnotationPresent(Component.class) && clazz.getAnnotation(Component.class).singleton())) {
-                // 对于单例，使用线程安全的方式获取或创建实例
-                // 放入占位符（Future模式），防止CHM的循环更改
-                // 类似于数据库缓存击穿的加锁等待解决方案
-                var future = new CompletableFuture<T>();
-                var obj = singletons.putIfAbsent(clazz, future);
-                if (obj == null) {
-                    // 当前线程负责创建实例
-                    try {
-                        instance = createInstance(clazz);
-                        if (instance instanceof InitializableComponent inst) {
-                            // 如果实现接口，执行后初始化方法
-                            inst.postConstruct();
-                        }
-                        future.complete(instance); // 完成Future
-                        singletonInstances.push(instance); // 记录单例实例以便关闭时销毁
-                        singletons.put(clazz, instance); // 替换占位符为实际实例
-                    } catch (InstanceConstructException e) {
-                        singletons.remove(clazz); // 创建失败，移除占位符
-                        future.completeExceptionally(e); // 完成Future异常
-                        throw e;
-                    }
-                } else if (obj instanceof CompletableFuture<?> instFuture) {
-                    // 其他线程正在创建实例，等待其完成
-                    try {
-                        instance = clazz.cast(instFuture.get());
-                    } catch (InterruptedException e) {
-                        // 构建过程中被中断
-                        Thread.currentThread().interrupt();
-                    } catch (ExecutionException e) {
-                        // 异步构建失败
-                        throw new InstanceConstructException(
-                          "Concurrent instance creation failed for Class %s",
-                          clazz.getName()
-                        );
-                    }
-                } else {
-                    // 实例已存在，直接返回
-                    instance = clazz.cast(obj);
-                }
+                instance = singletonManager.getSingletonInstance(clazz);
             } else {
                 // 对于非单例，尝试自动注入
                 try {
@@ -176,7 +61,6 @@ public final class Instance {
                     throw new InstanceConstructException("Failed to create instance of Class %s", clazz.getName(), e);
                 }
             }
-
             return instance;
         } finally {
             // 移除构造标记
@@ -225,7 +109,7 @@ public final class Instance {
      * @return 类的实例
      * @throws InstanceConstructException 如果实例创建失败或类缺少合适的构造方法
      */
-    private static <T> T createInstance(Class<T> clazz)
+    static <T> T createInstance(Class<T> clazz)
     throws InstanceConstructException {
         // 查找带有自动注入注解 / 零参构造方法
         Constructor<?> autoConstructor = null;
@@ -336,98 +220,6 @@ public final class Instance {
      * 关闭 IOC 容器，销毁所有实例
      */
     public static void close() {
-        while (!singletonInstances.isEmpty()) {
-            var instance = singletonInstances.pop();
-            if (instance instanceof DestroyableComponent destroyable) {
-                try {
-                    destroyable.preDestroy();
-                } catch (Exception e) {
-                    // 忽略销毁时的异常
-                }
-            }
-            singletons.remove(instance.getClass());
-        }
-    }
-
-    private static final class ImplManager {
-        private final Map<Class<?>, ImplMap> implementations = new ConcurrentHashMap<>();
-
-        private void putImpl(Class<?> interfaceOrClass, String name, Class<?> implClass, boolean primary) {
-            var implMap = implementations.computeIfAbsent(interfaceOrClass, clazz -> new ImplMap());
-            synchronized (implMap) {    // 同步以防止并发修改
-                if (implMap.impls.containsKey(name) && implMap.impls.get(name) != implClass) {
-                    // 重复的实现名称
-                    throw new FatalError(
-                      "Duplicate implementation name '%s' found for %s: %s and %s",
-                      name,
-                      interfaceOrClass.getName(),
-                      implMap.impls.get(name).getName(),
-                      implClass.getName()
-                    );
-                }
-                implMap.impls.put(name, implClass);
-                if (primary) {
-                    if (implMap.primary != null && implMap.primary != implClass) {
-                        // 重复的主实现
-                        throw new FatalError(
-                          "Multiple primary implementations found for %s: %s and %s",
-                          interfaceOrClass.getName(),
-                          implMap.primary.getName(),
-                          implClass.getName()
-                        );
-                    }
-                    implMap.primary = implClass;
-                }
-            }
-        }
-
-        private Class<?> getImpl(Class<?> interfaceOrClass, String name) {
-            var implMap = implementations.get(interfaceOrClass);
-            if (implMap == null) {
-                // 没有任何实现
-                throw new ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName());
-            } else if (!implMap.impls.containsKey(name)) {
-                // 没有指定名称的实现
-                throw new ClassNoImplementation(
-                  "No implementation named '%s' found for %s",
-                  name,
-                  interfaceOrClass.getName()
-                );
-            } else {
-                // 返回指定名称的实现
-                return implMap.impls.get(name);
-            }
-        }
-
-        private Class<?> getImpl(Class<?> interfaceOrClass) {
-            var implMap = implementations.get(interfaceOrClass);
-            Class<?> implClass;
-            if (implMap == null) {
-                // 没有任何实现
-                throw new ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName());
-            } else if (implMap.primary != null) {
-                // 返回主实现
-                implClass = implMap.primary;
-            } else {
-                // 没有主实现，检查实现数量
-                if (implMap.impls.size() == 1) {
-                    // 只有一个实现，返回它
-                    implClass = implMap.impls.values().iterator().next();
-                } else {
-                    // 多个实现，无法确定使用哪个，抛出异常
-                    throw new ClassNoImplementation(
-                      "Multiple implementations found for %s, but no primary implementation is defined. Implementations: %s",
-                      interfaceOrClass.getName(),
-                      String.join(", ", implMap.impls.keySet())
-                    );
-                }
-            }
-            return implClass;
-        }
-
-        private static final class ImplMap {
-            Map<String, Class<?>> impls   = new HashMap<>();
-            Class<?>              primary = null;
-        }
+        singletonManager.preDestroy();
     }
 }

@@ -14,11 +14,11 @@ public class MessageEventFactory {
     /// 发送者信息
     @Getter
     @Setter
-    private EntityInfo               senderInfo  = null;
+    private MessageEvent.EntityInfo  senderInfo  = null;
     /// 群组信息
     @Getter
     @Setter
-    private GroupInfo                groupInfo   = null;
+    private MessageEvent.GroupInfo   groupInfo   = null;
     /// 消息类型
     @Getter
     @Setter
@@ -30,9 +30,10 @@ public class MessageEventFactory {
     /// 消息内容
     @Getter
     @Setter
-    private MessageSeg               message     = null;
+    private MessageEvent.MessageSeg  message     = null;
+
     /// 额外字段的键值对
-    private Map<String, String>      extra       = new HashMap<>();
+    private final Map<String, String> extra = new HashMap<>();
 
     public void putExtra(String key, String value) {
         this.extra.put(key, value);
@@ -43,9 +44,7 @@ public class MessageEventFactory {
     }
 
     public void removeExtra(String key) {
-        if (this.extra != null) {
-            this.extra.remove(key);
-        }
+        this.extra.remove(key);
     }
 
     public MessageEvent build() {

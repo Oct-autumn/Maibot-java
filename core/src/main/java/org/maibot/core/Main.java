@@ -50,7 +50,7 @@ public class Main {
      *
      * @param args 命令行参数
      */
-    static void main(String[] args) {
+    public static void main(String[] args) {
         // 不允许在此方法中再次抛出异常
         // 所有未捕获异常均视为致命错误，记录日志后终止运行
 

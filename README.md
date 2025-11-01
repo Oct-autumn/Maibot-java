@@ -42,3 +42,13 @@ Maibot 的 Java 重构版，推倒 Python 版的全部代码，重新设计，�
         - 并行思维流模块，对每个交互流独立并行处理。
     - `util`: 工具类，包含各种辅助功能。
 - `org.maibot.sdk`：SDK，为第三方开发者提供接口；
+
+## 开源协议（License）
+
+本项目的代码分为两部分：
+
+- Maibot-JE CORE，采用 GPL-3.0 许可证开源；（见 [CORE README文件](./core/README.md)）
+- Maibot-JE SDK，采用 MIT 许可证开源；（见 [SDK README文件](./sdk/README.md)）
+- example_mods 目录下的示例模组，采用 MIT 许可证开源；
+
+使用本项目代码时，请遵守相应的开源许可证要求。

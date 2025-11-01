@@ -1,3 +1,20 @@
+/* Maibot-JavaEdition - A LLM-based Agent framework written in Java
+ * Copyright (C) 2025 Maibot-JE Project Developers
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package org.maibot.core;
 
 import org.maibot.core.commandline.TerminalController;
@@ -59,6 +76,13 @@ public class Main {
         Instance.scanImplementations("org.maibot", Thread.currentThread().getContextClassLoader());
 
         var buildInfo = Instance.get(BuildInfo.class);
+        System.out.print("""
+                         Maibot-JavaEdition Copyright (C) 2025  Maibot-JE Project Developers
+                         This program comes with ABSOLUTELY NO WARRANTY; see LICENSE (15.
+                         Disclaimer of Warranty.) for details.  This is free software,
+                         and you are welcome to redistribute it under certain conditions;
+                         also see LICENSE for details.
+                         """);
         System.out.print("""
                            __  __           _   _               _                 _   _____\s
                           |  \\/  |   __ _  (_) | |__     ___   | |_              | | | ____|
@@ -130,8 +154,6 @@ public class Main {
         // 启动终端
         log.info("正在启动终端...");
         // 阻塞调用，直到终端退出
-        this.taskExecutorService.submit(
-          this.terminalController::runCommandline, false
-        ).join();
+        this.taskExecutorService.submit(this.terminalController::runCommandline, false).join();
     }
 }

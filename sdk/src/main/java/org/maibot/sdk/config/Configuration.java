@@ -16,4 +16,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Configuration {
+    /// 配置命名空间，默认为<code>config</code>
+    /// 该字段尚未启用，保留以备将来使用
+    String namespace() default "config";
 }

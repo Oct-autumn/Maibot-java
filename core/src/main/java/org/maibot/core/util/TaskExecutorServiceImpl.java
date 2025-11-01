@@ -2,8 +2,10 @@ package org.maibot.core.util;
 
 import lombok.Getter;
 import lombok.NonNull;
+import org.maibot.core.modloader.ModManager;
 import org.maibot.sdk.TaskExecutorService;
 import org.maibot.sdk.exceptions.FatalError;
+import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +27,8 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
     @Getter
     private final ExecutorService    virtualExecutor;
 
-    public TaskExecutorServiceImpl() {
+    @AutoInject
+    public TaskExecutorServiceImpl(ModManager modManager) {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             log.error("An uncaught exception occurred in thread {}", t.getName(), e);
             System.exit(1);
@@ -44,6 +47,11 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
               public Thread newThread(@NonNull Runnable r) {
                   Thread thread = new Thread(r);
                   thread.setName("T-" + threadNumber.getAndIncrement());
+
+                  if (modManager.getModClassLoader() != null) {
+                      thread.setContextClassLoader(modManager.getModClassLoader());
+                  }
+
                   return thread;
               }
           }
@@ -63,13 +71,15 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
                       }
                   });
                   thread.setName("VT-" + threadId);
+
+                  if (modManager.getModClassLoader() != null) {
+                      thread.setContextClassLoader(modManager.getModClassLoader());
+                  }
+
                   return thread;
               }
           }
         );
-
-        // 预创建线程池中的核心线程
-        this.executor.prestartAllCoreThreads();
     }
 
     /**

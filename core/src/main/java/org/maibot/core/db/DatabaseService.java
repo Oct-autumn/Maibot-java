@@ -46,25 +46,6 @@ public class DatabaseService implements DestroyableComponent {
         this.init(conf);
     }
 
-    private static PersistenceConfiguration getDbConfiguration(MainConfig.LocalData.Database conf) {
-        var cfg = new PersistenceConfiguration("maibot-pu");
-        // SQLite 配置
-        // TODO: 对其他数据库的支持
-        cfg.property("hibernate.connection.driver_class", "org.sqlite.JDBC");
-        cfg.property("hibernate.connection.url", "jdbc:sqlite:" + conf.sqlitePath);
-        cfg.property("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
-        cfg.property("hibernate.hbm2ddl.auto", "update");
-        cfg.property("hibernate.c3p0.min_size", 1);
-        cfg.property("hibernate.c3p0.max_size", 1);
-        cfg.property("hibernate.c3p0.timeout", 0);
-
-        // 开发时开启 SQL 日志
-        cfg.property("hibernate.show_sql", "true");
-        cfg.property("hibernate.format_sql", "true");
-
-        return cfg;
-    }
-
     /**
      * 初始化数据库管理器（独立方法，用于热重载）
      *
@@ -73,18 +54,18 @@ public class DatabaseService implements DestroyableComponent {
     public void init(MainConfig.LocalData.Database conf) {
         // 检查sqlitePath文件是否存在，不存在则创建
 
-        var dbFile = new File(conf.sqlitePath);
+        var dbFile = new File(conf.sqlitePath());
         if (!dbFile.exists()) {
             var parent = dbFile.getParentFile();
             if (parent != null && !parent.exists()) {
                 if (!parent.mkdirs()) {
-                    throw new FatalError("Failed to create directories for database file: %s", conf.sqlitePath);
+                    throw new FatalError("Failed to create directories for database file: %s", conf.sqlitePath());
                 }
             }
             try {
                 var res = dbFile.createNewFile();
             } catch (IOException e) {
-                throw new FatalError("Failed to create database file: %s", conf.sqlitePath, e);
+                throw new FatalError("Failed to create database file: %s", conf.sqlitePath(), e);
             }
         }
 
@@ -127,19 +108,23 @@ public class DatabaseService implements DestroyableComponent {
         }
     }
 
-    /**
-     * 关闭数据库
-     */
-    @Override
-    public void preDestroy() {
-        if (this.entityManagerFactory != null) {
-            try {
-                this.entityManagerFactory.close();
-            } catch (Exception e) {
-                log.error("关闭数据库服务时发生错误", e);
-            }
-            this.entityManagerFactory = null;
-        }
+    private static PersistenceConfiguration getDbConfiguration(MainConfig.LocalData.Database conf) {
+        var cfg = new PersistenceConfiguration("maibot-pu");
+        // SQLite 配置
+        // TODO: 对其他数据库的支持
+        cfg.property("hibernate.connection.driver_class", "org.sqlite.JDBC");
+        cfg.property("hibernate.connection.url", "jdbc:sqlite:" + conf.sqlitePath());
+        cfg.property("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
+        cfg.property("hibernate.hbm2ddl.auto", "update");
+        cfg.property("hibernate.c3p0.min_size", 1);
+        cfg.property("hibernate.c3p0.max_size", 1);
+        cfg.property("hibernate.c3p0.timeout", 0);
+
+        // 开发时开启 SQL 日志
+        cfg.property("hibernate.show_sql", "true");
+        cfg.property("hibernate.format_sql", "true");
+
+        return cfg;
     }
 
     private Semver getDbVer() {
@@ -189,6 +174,29 @@ public class DatabaseService implements DestroyableComponent {
         }
     }
 
+    /**
+     * 关闭数据库
+     */
+    @Override
+    public void preDestroy() {
+        if (this.entityManagerFactory != null) {
+            try {
+                this.entityManagerFactory.close();
+            } catch (Exception e) {
+                log.error("关闭数据库服务时发生错误", e);
+            }
+            this.entityManagerFactory = null;
+        }
+    }
+
+    public <T> CompletableFuture<T> execAsync(Function<EntityManager, T> func) {
+        return this.taskExecutorService.submit(() -> exec(func), false);
+    }
+
+    public CompletableFuture<Object> execAsync(Consumer<EntityManager> func) {
+        return this.taskExecutorService.submit(() -> exec(func), false);
+    }
+
     public void exec(Consumer<EntityManager> func)
     throws DbOperationException {
         if (this.entityManagerFactory == null) {
@@ -209,13 +217,5 @@ public class DatabaseService implements DestroyableComponent {
         } finally {
             em.close();
         }
-    }
-
-    public <T> CompletableFuture<T> execAsync(Function<EntityManager, T> func) {
-        return this.taskExecutorService.submit(() -> exec(func), false);
-    }
-
-    public CompletableFuture<Object> execAsync(Consumer<EntityManager> func) {
-        return this.taskExecutorService.submit(() -> exec(func), false);
     }
 }

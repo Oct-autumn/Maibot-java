@@ -111,9 +111,7 @@ public class ModDependencyTree {
             if (!rbStr.isEmpty()) {
                 Semver rb = new Semver(rbStr);
                 int cmp = version.compareTo(rb);
-                if (cmp > 0 || (cmp == 0 && !upperInclusive)) {
-                    return false;
-                }
+                return cmp <= 0 && (cmp != 0 || upperInclusive);
             }
         }
         return true;

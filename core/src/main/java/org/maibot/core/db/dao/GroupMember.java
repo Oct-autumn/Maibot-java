@@ -43,17 +43,17 @@ public class GroupMember {
             this.groupId = groupId;
         }
 
+        @Override
+        public int hashCode() {
+            return Objects.hash(entityId, groupId);
+        }
+
         // equals and hashCode methods should be implemented for composite key
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof GroupMemberId that)) return false;
             return entityId.equals(that.entityId) && groupId.equals(that.groupId);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(entityId, groupId);
         }
     }
 }

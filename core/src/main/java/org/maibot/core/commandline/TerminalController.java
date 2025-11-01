@@ -15,8 +15,6 @@ import picocli.CommandLine;
 import picocli.shell.jline3.PicocliJLineCompleter;
 
 import java.io.IOException;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 public class TerminalController implements DestroyableComponent {
@@ -58,14 +56,6 @@ public class TerminalController implements DestroyableComponent {
         }
     }
 
-    /**
-     * 停止终端（当前
-     */
-    public void stopCommandline() {
-        this.running = false;
-        LogConfig.setTerminalLineReader(null);
-    }
-
     public void closeTerminal() {
         try {
             this.terminal.close();
@@ -77,5 +67,13 @@ public class TerminalController implements DestroyableComponent {
     @Override
     public void preDestroy() {
         stopCommandline();
+    }
+
+    /**
+     * 停止终端（当前正在运行时）
+     */
+    public void stopCommandline() {
+        this.running = false;
+        LogConfig.setTerminalLineReader(null);
     }
 }

@@ -46,4 +46,5 @@ src/main/resources/META-INF/build-inf.properties
 logs/
 data/
 mods/
+config/
 config.toml

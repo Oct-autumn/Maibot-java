@@ -54,11 +54,6 @@ public class ThinkingFlow {
         this.flowObserver.stop();
     }
 
-    public void setState(FlowState newState) {
-        this.state = newState;
-        this.flowObserver.onStateChange(newState);
-    }
-
     public void addToObservationWindow(Message message) {
         this.observationWindow.addLast(message);
         // 限制观察窗口大小，例如最多保留最近100条消息
@@ -69,6 +64,11 @@ public class ThinkingFlow {
         if (!this.state.isAtLeast(FlowState.ACTIVE)) {
             this.setState(FlowState.ACTIVE);
         }
+    }
+
+    public void setState(FlowState newState) {
+        this.state = newState;
+        this.flowObserver.onStateChange(newState);
     }
 
     public enum FlowState {
@@ -123,14 +123,6 @@ public class ThinkingFlow {
             }
         }
 
-        /**
-         * 停止观察
-         */
-        public void stop() {
-            running = false;
-            this.signalObserver();
-        }
-
         private void signalObserver() {
             lock.lock();
             try {
@@ -138,6 +130,14 @@ public class ThinkingFlow {
             } finally {
                 lock.unlock();
             }
+        }
+
+        /**
+         * 停止观察
+         */
+        public void stop() {
+            running = false;
+            this.signalObserver();
         }
 
         @Override

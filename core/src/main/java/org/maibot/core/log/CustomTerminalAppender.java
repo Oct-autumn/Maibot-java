@@ -22,6 +22,20 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
     @Setter
     private LineReader lineReader;
 
+    @Override
+    protected void append(ILoggingEvent eventObject) {
+        try {
+            String msg = encode(eventObject);
+            if (lineReader != null) {
+                lineReader.printAbove(msg);
+            } else {
+                System.out.print(msg);
+            }
+        } catch (Exception ignore) {
+            // 处理异常
+        }
+    }
+
     private String encode(ILoggingEvent event) {
         var levelColor = switch (event.getLevel().toString()) {
             case "TRACE" -> "FG_BRIGHT_BLACK";
@@ -164,19 +178,5 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
 
         // 无法压缩到指定长度，返回原始名称
         return loggerName;
-    }
-
-    @Override
-    protected void append(ILoggingEvent eventObject) {
-        try {
-            String msg = encode(eventObject);
-            if (lineReader != null) {
-                lineReader.printAbove(msg);
-            } else {
-                System.out.print(msg);
-            }
-        } catch (Exception ignore) {
-            // 处理异常
-        }
     }
 }

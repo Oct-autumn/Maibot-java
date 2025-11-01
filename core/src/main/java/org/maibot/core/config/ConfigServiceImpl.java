@@ -8,6 +8,7 @@ import org.maibot.sdk.exceptions.NamespaceAlreadyExist;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.ioc.InitializableComponent;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.toml.TomlMapper;
@@ -26,18 +27,81 @@ import java.util.regex.Pattern;
 // TODO: 支持版本合并
 @Component
 public class ConfigServiceImpl implements ConfigService, InitializableComponent {
-    public static final  String  CONFIG_DIR               = "config";
-    public static final  String  MOD_CONFIG_TEMPLATE_FILE = "config.template.toml";
-    private static final String  CORE_CONFIG_PATH         = "config.toml";
-    private static final Pattern KEY_SPLIT_PATTERN        = Pattern.compile(
-      "^((?<namespace>[0-9a-zA-Z-_]+):)?(?<path>[0-9a-zA-Z_.]+)$");
+    public static final  String CONFIG_DIR               = "config";
+    public static final  String MOD_CONFIG_TEMPLATE_FILE = "config.template.toml";
+    private static final String CORE_CONFIG_PATH         = "config.toml";
+
+    /// 访问语法：
+    /// - <code>namespcae:field1.field2</code>: 指定命名空间，访问某个字段
+    /// - <code>field1.field2</code>: 默认命名空间为 core，访问某个字段
+    /// - <code>namespace:*</code>: 直接获取整个命名空间的 JsonNode
+    ///
+    /// 命名空间由字母、数字、下划线组成，不能包含空格；
+    /// 字段路径由字母、数字、下划线和点号组成，不能包含空格。
+    private static final Pattern KEY_SPLIT_PATTERN  = Pattern.compile(
+      "(?:(?<namespace>[a-zA-Z0-9_]+):)?(?<path>[a-zA-Z0-9_.*]+)$"
+    );
+    private static final Pattern FIELD_PATH_PATTERN = Pattern.compile(
+      "^[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)*$"
+    );
 
     private final Map<String, AtomicReference<JsonNode>> namespacedConfigs = new ConcurrentHashMap<>();
+    private final ObjectMapper                           objectMapper      = new ObjectMapper();
 
     @Override
     public void postConstruct() {
+        // 确保配置目录存在
+        ensureConfigDirExists();
         // 加载core配置
         loadCoreConfig();
+    }
+
+    /**
+     * 确保配置目录存在
+     */
+    private void ensureConfigDirExists() {
+        File configDir = new File(CONFIG_DIR);
+        if (!configDir.exists()) {
+            if (!configDir.mkdirs()) {
+                throw new FatalError(
+                  "Failed to create config directory '%s'. Please check the accessibility and permissions of the parent directory.",
+                  CONFIG_DIR
+                );
+            }
+        }
+    }
+
+    /**
+     * 加载配置文件
+     */
+    private void loadCoreConfig() {
+        File configFile = new File(CORE_CONFIG_PATH);
+        if (!configFile.exists()) {
+            System.out.println("配置文件不存在，正在创建默认配置文件...");
+            try (var inputStream = this.getClass()
+                                       .getClassLoader()
+                                       .getResourceAsStream("/org/maibot/core/Config.template.toml")) {
+                if (inputStream == null) {
+                    throw new FatalError("Default core config template not found in resources.");
+                }
+                this.createDefaultConfig(CORE_CONFIG_PATH, inputStream);
+            } catch (IOException e) {
+                throw new FatalError("Failed to create default core config file.", e);
+            }
+            System.out.println("默认配置文件创建成功，请根据需要修改 " + CORE_CONFIG_PATH + " 后重新启动程序。");
+            System.exit(1);
+        }
+
+        // 读取Toml配置
+        var tomlReader = new TomlMapper().readerFor(MainConfig.class)
+                                         .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        try {
+            MainConfig mainConfig = tomlReader.readValue(configFile);
+
+            this.putConfigNameSpace("core", objectMapper.valueToTree(mainConfig));
+        } catch (JacksonException e) {
+            throw new FatalError("Failed to parse core config file.", e);
+        }
     }
 
     /**
@@ -53,59 +117,6 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
         var existing = namespacedConfigs.putIfAbsent(namespace, ref);
         if (existing != null) {
             throw new NamespaceAlreadyExist("Namespace %s already exists.", namespace);
-        }
-    }
-
-    /**
-     * 移除一个配置命名空间
-     *
-     * @param namespace 命名空间
-     */
-    public void removeConfigNameSpace(String namespace) {
-        namespacedConfigs.remove(namespace);
-    }
-
-    @Override
-    public JsonNode getRawJson(String key)
-    throws InvalidConfigPath {
-        var matcher = KEY_SPLIT_PATTERN.matcher(key);
-        if (!matcher.matches()) {
-            throw new InvalidConfigPath(
-              "Invalid config key format: '%s'. Expected format like '${namespace:field1.field2}' or '${field1.field2}'.",
-              key
-            );
-        }
-        String namespace = matcher.group("namespace");
-        if (namespace == null || namespace.isBlank()) {
-            namespace = "core";
-        }
-        String path = matcher.group("path");
-
-        AtomicReference<JsonNode> namespaceRef = namespacedConfigs.get(namespace);
-        if (namespaceRef == null) {
-            throw new InvalidConfigPath("Namespace '%s' not found.", namespace);
-        }
-        String[] keys = path.split("\\.");
-        JsonNode current = namespaceRef.get();
-        for (String k : keys) {
-            if (current.has(k)) {
-                current = current.get(k);
-                continue;
-            }
-            throw new InvalidConfigPath("Path '%s' not found in namespace '%s'.", path, namespace);
-        }
-        return current;
-    }
-
-    @Override
-    public <T> T getConfig(String key, Class<T> clazz)
-    throws InvalidConfigPath {
-        JsonNode rawJson = getRawJson(key);
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            return objectMapper.treeToValue(rawJson, clazz);
-        } catch (JacksonException e) {
-            throw new InvalidConfigPath("Failed to convert config value to class %s.", clazz.getName(), e);
         }
     }
 
@@ -130,48 +141,70 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     }
 
     /**
-     * 加载配置文件
+     * 获取原始的配置 JSON 节点
+     * <p>访问语法：
+     * <ul>
+     * <li><code>namespcae:field1.field2</code>: 指定命名空间，访问某个字段</li>
+     * <li><code>field1.field2</code>: 默认命名空间为 core，访问某个字段</li>
+     * <li><code>namespace:*</code>: 直接获取整个命名空间的 JsonNode</li>
+     * </ul>
+     * <p>命名空间由字母、数字、下划线组成，不能包含空格；
+     * 字段路径由字母、数字、下划线和点号组成，不能包含空格。
+     *
+     * @param key 配置键
+     * @return 配置 JSON 节点
+     * @throws InvalidConfigPath 如果配置路径无效
      */
-    private void loadCoreConfig() {
-        File configFile = new File(CORE_CONFIG_PATH);
-        if (!configFile.exists()) {
-            System.out.println("配置文件不存在，正在创建默认配置文件...");
-            try (var inputStream = this.getClass().getClassLoader().getResourceAsStream(
-              "/org/maibot/core/Config.template.toml"
-            )) {
-                if (inputStream == null) {
-                    throw new FatalError("Default core config template not found in resources.");
-                }
-                this.createDefaultConfig(CORE_CONFIG_PATH, inputStream);
-            } catch (IOException e) {
-                throw new FatalError("Failed to create default core config file.", e);
-            }
-            System.out.println("默认配置文件创建成功，请根据需要修改 " + CORE_CONFIG_PATH + " 后重新启动程序。");
-            System.exit(1);
+    @Override
+    public JsonNode getRawJson(String key)
+    throws InvalidConfigPath {
+        var matcher = KEY_SPLIT_PATTERN.matcher(key);
+        if (!matcher.matches()) {
+            throw new InvalidConfigPath(
+              "Invalid config key format: '%s'. Expected format like '${namespace:field1.field2}' or '${field1.field2}'.",
+              key
+            );
+        }
+        String namespace = matcher.group("namespace");
+        String path = matcher.group("path");
+        if (namespace == null || namespace.isBlank()) {
+            namespace = "core";
         }
 
-        // 读取Toml配置
-        var tomlMapper = new TomlMapper();
-        try (var tomlParser = tomlMapper.createParser(new File(CORE_CONFIG_PATH))) {
-            JsonNode rawJsonMap = tomlMapper.readTree(tomlParser);
-
-            // 检查是否为JsonObject
-            if (!rawJsonMap.isObject()) {
-                throw new FatalError("Core config root must be a JSON object.");
-            }
-
-            // 数据验证
-            try {
-                var objectMapper = new ObjectMapper();
-                objectMapper.treeToValue(rawJsonMap, MainConfig.class);
-            } catch (JacksonException e) {
-                throw new FatalError("Core config validation failed.", e);
-            }
-
-            this.putConfigNameSpace("core", rawJsonMap);
-        } catch (IllegalStateException e) {
-            throw new FatalError("Failed to parse core config file.", e);
+        AtomicReference<JsonNode> namespaceRef = namespacedConfigs.get(namespace);
+        if (namespaceRef == null) {
+            throw new InvalidConfigPath("Namespace '%s' not found.", namespace);
         }
+
+        if (path.equals("*")) {
+            // 直接返回整个命名空间
+            return namespaceRef.get();
+        } else if (!FIELD_PATH_PATTERN.matcher(path).matches()) {
+            throw new InvalidConfigPath(
+              "Invalid field path format: '%s'. Expected format like 'field1.field2'.",
+              path
+            );
+        }
+
+        String[] keys = path.split("\\.");
+        JsonNode current = namespaceRef.get();
+        for (String k : keys) {
+            if (current.has(k)) {
+                current = current.get(k);
+                continue;
+            }
+            throw new InvalidConfigPath("Path '%s' not found in namespace '%s'.", path, namespace);
+        }
+        return current;
+    }
+
+    /**
+     * 移除一个配置命名空间
+     *
+     * @param namespace 命名空间
+     */
+    public void removeConfigNameSpace(String namespace) {
+        namespacedConfigs.remove(namespace);
     }
 
     /**
@@ -179,47 +212,51 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
      *
      * @param namespace           命名空间
      * @param configClass         配置类
-     * @param configFilePath      配置文件路径
+     * @param configFileName      配置文件路径
      * @param templateInputStream 模板文件路径
      * @return 是否成功加载配置
      */
-    public boolean loadExtraConfig(
+    public <T> boolean loadExtraConfig(
       String namespace,
-      Class<?> configClass,
-      String configFilePath,
+      Class<T> configClass,
+      String configFileName,
       InputStream templateInputStream
     ) {
-        File configFile = new File(Path.of(CONFIG_DIR, configFilePath).toString());
+        var configFilePath = Path.of(CONFIG_DIR, configFileName).toString();
+        File configFile = new File(configFilePath);
         if (!configFile.exists()) {
             this.createDefaultConfig(configFilePath, templateInputStream);
             return false;
         }
 
         // 根据配置文件的文件名后缀选择解析器
-        if (configFilePath.endsWith(".toml")) {
-            var tomlMapper = new TomlMapper();
-            try (var tomlParser = tomlMapper.createParser(new File(configFilePath))) {
-                JsonNode rawJsonMap = tomlMapper.readTree(tomlParser);
+        if (configFile.getName().endsWith(".toml")) {
+            var tomlReader = new TomlMapper().readerFor(configClass)
+                                             .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            try {
+                T rawJsonMap = tomlReader.readValue(configFile);
 
-                // 检查是否为JsonObject
-                if (!rawJsonMap.isObject()) {
-                    throw new FatalError("Config file '%s' root must be a JSON object.", configFilePath);
-                }
-
-                // 数据验证
-                try {
-                    var objectMapper = new ObjectMapper();
-                    objectMapper.treeToValue(rawJsonMap, configClass);
-                } catch (JacksonException e) {
-                    throw new FatalError("Config file '%s' validation failed.", configFilePath, e);
-                }
-
-                this.putConfigNameSpace(namespace, rawJsonMap);
+                this.putConfigNameSpace(namespace, objectMapper.valueToTree(rawJsonMap));
             } catch (JacksonException e) {
                 throw new FatalError("Failed to parse config file '%s'.", configFilePath, e);
             }
+        } else {
+            throw new FatalError("Unsupported config file format: '%s'. Only .toml is supported.", configFilePath);
         }
 
         return true;
     }
+
+    @Override
+    public <T> T getConfig(String key, Class<T> clazz)
+    throws InvalidConfigPath {
+        JsonNode rawJson = getRawJson(key);
+        try {
+            return this.objectMapper.treeToValue(rawJson, clazz);
+        } catch (JacksonException e) {
+            throw new InvalidConfigPath("Failed to convert config value to class %s.", clazz.getName(), e);
+        }
+    }
+
+
 }

@@ -47,7 +47,7 @@ public final class Instance {
 
         try (var scanResult = scanner.scan()) {
             // 扫描指定包下的所有类，找到带有 @Component 注解的实现类
-            scanResult.getClassesWithAnnotation(Component.class.getName()).forEach(classInfo -> {
+            scanResult.getClassesWithAnnotation(Component.class).forEach(classInfo -> {
                 try {
                     // 只注册非抽象类和非接口
                     if (!Modifier.isAbstract(classInfo.getModifiers()) && !classInfo.isInterface()) {
@@ -68,20 +68,37 @@ public final class Instance {
         }
 
         for (Class<?> clazz : classes) {
-            String name = clazz.getAnnotation(Component.class).name();
+            // 获取组件名称
+            var anno = clazz.getAnnotation(Component.class);
+            if (anno == null) {
+                // 说明@Component作为元注解使用，获取实际注解
+                anno = Arrays.stream(clazz.getAnnotations())
+                             .map(a -> a.annotationType().getAnnotation(Component.class))
+                             .filter(Objects::nonNull)
+                             .findFirst()
+                             .orElseThrow(
+                               // 理论上不会发生，因为前面已经通过ClassGraph筛选过了
+                               () -> new FatalError(
+                                 "Component annotation not found on class %s during registration. This shouldn't happen.",
+                                 clazz.getName()
+                               )
+                             );
+            }
+
+            String name = anno.name();
             if (name.isBlank()) {
                 name = clazz.getSimpleName();
             }
 
             // 注册类及其所有接口的实现
-            implManager.putImpl(clazz, name, clazz, clazz.getAnnotation(Component.class).primaryImpl());
+            implManager.putImpl(clazz, name, clazz, anno.primaryImpl());
 
             for (Class<?> iface : clazz.getInterfaces()) {
-                implManager.putImpl(iface, name, clazz, clazz.getAnnotation(Component.class).primaryImpl());
+                implManager.putImpl(iface, name, clazz, anno.primaryImpl());
             }
 
             for (Class<?> superClass = clazz.getSuperclass(); superClass != null && superClass != Object.class; superClass = superClass.getSuperclass()) {
-                implManager.putImpl(superClass, name, clazz, clazz.getAnnotation(Component.class).primaryImpl());
+                implManager.putImpl(superClass, name, clazz, anno.primaryImpl());
             }
         }
     }

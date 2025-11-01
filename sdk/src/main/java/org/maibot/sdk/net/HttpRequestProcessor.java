@@ -17,14 +17,14 @@ public abstract class HttpRequestProcessor {
     private final   String     path;
 
 
+    public HttpRequestProcessor(HttpMethod method, String path, Class<?> loggerClass) {
+        this(method, path, LoggerFactory.getLogger(loggerClass));
+    }
+
     public HttpRequestProcessor(HttpMethod method, String path, Logger logger) {
         this.method = method;
         this.path = path;
         this.log = logger;
-    }
-
-    public HttpRequestProcessor(HttpMethod method, String path, Class<?> loggerClass) {
-        this(method, path, LoggerFactory.getLogger(loggerClass));
     }
 
     public void process(ChannelHandlerContext ctx, FullHttpRequest req)

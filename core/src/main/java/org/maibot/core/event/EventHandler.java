@@ -48,6 +48,12 @@ public abstract class EventHandler implements ChannelInboundHandler {
     }
 
     @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
+    throws Exception {
+
+    }
+
+    @Override
     public void handlerAdded(ChannelHandlerContext ctx)
     throws Exception {
     }
@@ -55,11 +61,5 @@ public abstract class EventHandler implements ChannelInboundHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx)
     throws Exception {
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-    throws Exception {
-
     }
 }

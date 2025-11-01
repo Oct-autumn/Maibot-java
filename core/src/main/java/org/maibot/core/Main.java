@@ -50,7 +50,7 @@ public class Main {
      *
      * @param args 命令行参数
      */
-    public static void main(String[] args) {
+    static void main(String[] args) {
         // 不允许在此方法中再次抛出异常
         // 所有未捕获异常均视为致命错误，记录日志后终止运行
 
@@ -105,7 +105,17 @@ public class Main {
     }
 
     public void run() {
-        // 启动网络服务
+        // Mod加载需要放在所有组件启动之前
+        // 因为组件可能依赖Mod提供的功能
+        // Mod加载完成后才能保证组件的正常工作
+        TimerProxy.start(
+          () -> {
+              log.info("正在加载Mod...");
+              this.modManager.loadMods();
+          }, "加载Mod用时：{}ms"
+        );
+
+
         TimerProxy.start(
           () -> {
               log.info("正在启动思维流...");
@@ -114,14 +124,14 @@ public class Main {
               log.info("正在启动网络服务...");
               this.taskExecutorService.submit(this.innerServer::run, true);
 
-              log.info("正在加载Mod...");
-              this.modManager.loadMods();
-
           }, "启动用时：{}ms"
         );
 
         // 启动终端
         log.info("正在启动终端...");
-        this.terminalController.runCommandline();   // 阻塞调用，直到终端退出
+        // 阻塞调用，直到终端退出
+        this.taskExecutorService.submit(
+          this.terminalController::runCommandline, false
+        ).join();
     }
 }

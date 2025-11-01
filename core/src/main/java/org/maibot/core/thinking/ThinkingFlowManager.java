@@ -59,28 +59,6 @@ public class ThinkingFlowManager implements DestroyableComponent {
     }
 
     /**
-     * 关闭思维流管理器
-     */
-    @Override
-    public void preDestroy() {
-        for (var flow : this.thinkingFlows.values()) {
-            flow.stopObserving();
-        }
-        this.saveToDb();
-    }
-
-    /**
-     * 保存当前状态到数据库
-     */
-    private void saveToDb() {
-        databaseService.exec(em -> {
-            for (var flow : this.thinkingFlows.values()) {
-                // TODO: 将Flow同步到数据库
-            }
-        });
-    }
-
-    /**
      * 从数据库恢复状态
      */
     private void restoreFromDb() {
@@ -117,6 +95,28 @@ public class ThinkingFlowManager implements DestroyableComponent {
                 this.taskExecutorService.submit(flow::observe, true);
             }
         }
+    }
+
+    /**
+     * 关闭思维流管理器
+     */
+    @Override
+    public void preDestroy() {
+        for (var flow : this.thinkingFlows.values()) {
+            flow.stopObserving();
+        }
+        this.saveToDb();
+    }
+
+    /**
+     * 保存当前状态到数据库
+     */
+    private void saveToDb() {
+        databaseService.exec(em -> {
+            for (var flow : this.thinkingFlows.values()) {
+                // TODO: 将Flow同步到数据库
+            }
+        });
     }
 
     /**

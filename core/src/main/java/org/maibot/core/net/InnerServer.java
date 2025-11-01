@@ -82,7 +82,7 @@ public class InnerServer implements DestroyableComponent {
 
 
         this.bootstrap.group(bossGroup, workerGroup);
-        this.bootstrap.localAddress(this.conf.host, this.conf.port);
+        this.bootstrap.localAddress(this.conf.host(), this.conf.port());
 
         var bindFuture = new CompletableFuture<Channel>();
         this.bootstrap.bind().addListener((ChannelFutureListener) future -> {
@@ -104,7 +104,7 @@ public class InnerServer implements DestroyableComponent {
         } catch (CompletionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof BindException) {
-                log.warn("网络服务绑定端口失败，端口 {} 可能已被占用", this.conf.port);
+                log.warn("网络服务绑定端口失败，端口 {} 可能已被占用", this.conf.port());
                 throw new FatalError("Failed to start InnerServer due to port binding failure", cause);
             } else {
                 log.warn("网络服务绑定过程中发生异常");

@@ -1,17 +1,18 @@
-package org.maibot.core.db;
+package org.maibot.core.persistence.db;
 
+import io.github.classgraph.ClassGraph;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.maibot.core.config.MainConfig;
-import org.maibot.core.db.dao.DatabaseVersion;
-import org.maibot.core.util.ClassScanner;
 import org.maibot.core.util.TaskExecutorServiceImpl;
+import org.maibot.sdk.db.DatabaseService;
+import org.maibot.sdk.db.dao.DatabaseVersion;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.NotInitialized;
-import org.maibot.sdk.exceptions.UnignorableException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.ioc.DestroyableComponent;
@@ -29,8 +30,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Component
-public class DatabaseService implements DestroyableComponent {
-    private static final Logger log         = LoggerFactory.getLogger(DatabaseService.class);
+public class DatabaseServiceImpl implements DestroyableComponent, DatabaseService {
+    private static final Logger log         = LoggerFactory.getLogger(DatabaseServiceImpl.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
     private final TaskExecutorServiceImpl taskExecutorService;
@@ -38,7 +39,7 @@ public class DatabaseService implements DestroyableComponent {
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
-    DatabaseService(
+    DatabaseServiceImpl(
       @Value("${local_data.database}") MainConfig.LocalData.Database conf,
       TaskExecutorServiceImpl taskExecutorService
     ) {
@@ -74,19 +75,19 @@ public class DatabaseService implements DestroyableComponent {
 
         // 注册实体类
         Set<Class<?>> entityClasses = new HashSet<>();
-        try {
-            entityClasses.addAll(ClassScanner.fileScan(
-              "org.maibot.core.db.dao",
-              clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
-            ));
-            entityClasses.addAll(ClassScanner.jarScan(
-              Thread.currentThread().getContextClassLoader(),
-              "org.maibot.core.db.dao",
-              clazz -> clazz.isAnnotationPresent(jakarta.persistence.Entity.class)
-            ));
-        } catch (UnignorableException e) {
-            log.warn("在搜索数据库实体类时发生异常");
-            throw new FatalError("Failed to search database entity class.", e);
+        var classLoader = Thread.currentThread().getContextClassLoader();
+        try (var findResult = new ClassGraph().overrideClassLoaders(classLoader)
+                                              .acceptPackages("org.maibot")
+                                              .enableAllInfo()
+                                              .scan()) {
+            var entityClassInfo = findResult.getClassesWithAnnotation(Entity.class);
+            for (var classInfo : entityClassInfo) {
+                var clazz = Class.forName(classInfo.getName(), false, classLoader);
+                entityClasses.add(clazz);
+            }
+        } catch (ClassNotFoundException ignored) {
+            // 不可能发生，因为 ClassGraph 和 Class.forName 使用的是同一个类加载器
+            // ClassGraph 已经确保了类的存在
         }
 
         entityClasses.forEach(clazz -> {
@@ -151,6 +152,7 @@ public class DatabaseService implements DestroyableComponent {
         }
     }
 
+    @Override
     public <T> T exec(Function<EntityManager, T> func)
     throws DbOperationException {
         if (this.entityManagerFactory == null) {
@@ -174,29 +176,17 @@ public class DatabaseService implements DestroyableComponent {
         }
     }
 
-    /**
-     * 关闭数据库
-     */
     @Override
-    public void preDestroy() {
-        if (this.entityManagerFactory != null) {
-            try {
-                this.entityManagerFactory.close();
-            } catch (Exception e) {
-                log.error("关闭数据库服务时发生错误", e);
-            }
-            this.entityManagerFactory = null;
-        }
-    }
-
     public <T> CompletableFuture<T> execAsync(Function<EntityManager, T> func) {
         return this.taskExecutorService.submit(() -> exec(func), false);
     }
 
+    @Override
     public CompletableFuture<Object> execAsync(Consumer<EntityManager> func) {
         return this.taskExecutorService.submit(() -> exec(func), false);
     }
 
+    @Override
     public void exec(Consumer<EntityManager> func)
     throws DbOperationException {
         if (this.entityManagerFactory == null) {
@@ -216,6 +206,21 @@ public class DatabaseService implements DestroyableComponent {
             throw new DbOperationException("Database operation failed", e);
         } finally {
             em.close();
+        }
+    }
+
+    /**
+     * 关闭数据库
+     */
+    @Override
+    public void preDestroy() {
+        if (this.entityManagerFactory != null) {
+            try {
+                this.entityManagerFactory.close();
+            } catch (Exception e) {
+                log.error("关闭数据库服务时发生错误", e);
+            }
+            this.entityManagerFactory = null;
         }
     }
 }

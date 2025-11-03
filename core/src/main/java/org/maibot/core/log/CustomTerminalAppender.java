@@ -22,15 +22,14 @@ public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
     private static final String MDC_TEMPLATE          = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
     private static final String THROWABLE_TEMPLATE    = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
 
-    private final boolean enableMdcTrack;
+    private final boolean    enableMdcTrack;
+    @Setter
+    private       LineReader lineReader;
 
     @AutoInject
     public CustomTerminalAppender(@Value("${log.enable_mdc_track}") boolean enableMdcTrack) {
         this.enableMdcTrack = enableMdcTrack;
     }
-
-    @Setter
-    private LineReader lineReader;
 
     @Override
     protected void append(ILoggingEvent eventObject) {

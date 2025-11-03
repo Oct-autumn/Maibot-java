@@ -1,12 +1,6 @@
 package org.maibot.core.config;
 
-import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.JsonGenerator;
-import tools.jackson.databind.SerializationContext;
-import tools.jackson.databind.ValueSerializer;
-import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
 

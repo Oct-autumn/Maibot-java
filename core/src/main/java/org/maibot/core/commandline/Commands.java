@@ -1,7 +1,6 @@
 package org.maibot.core.commandline;
 
 import org.maibot.core.ioc.Instance;
-import org.maibot.core.modloader.ModManager;
 import picocli.CommandLine;
 
 public class Commands {

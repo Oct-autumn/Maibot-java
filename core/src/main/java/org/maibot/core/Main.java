@@ -24,7 +24,9 @@ import org.maibot.core.ioc.Instance;
 import org.maibot.core.log.LogConfig;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.core.net.InnerServer;
+import org.maibot.core.net.client.HttpClientProviderImpl;
 import org.maibot.core.thinking.ThinkingFlowManager;
+import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.core.util.TimerProxy;
 import org.maibot.sdk.TaskExecutorService;
 import org.maibot.sdk.config.ConfigService;
@@ -32,6 +34,7 @@ import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.IgnorableException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.net.HttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,22 +44,25 @@ public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     /* 单例资源区 */
-    private final TaskExecutorService taskExecutorService;
-    private final InnerServer         innerServer;
-    private final TerminalController  terminalController;
-    private final ThinkingFlowManager thinkingFlowManager;
-    private final ModManager          modManager;
+    private final TaskExecutorServiceImpl taskExecutorService;
+    private final InnerServer             innerServer;
+    private final HttpClientProviderImpl  httpClientProvider;
+    private final TerminalController      terminalController;
+    private final ThinkingFlowManager     thinkingFlowManager;
+    private final ModManager              modManager;
 
     @AutoInject
     public Main(
-      TaskExecutorService taskExecutorService,
+      TaskExecutorServiceImpl taskExecutorService,
       InnerServer innerServer,
+      HttpClientProviderImpl httpClientProvider,
       TerminalController terminalController,
       ThinkingFlowManager thinkingFlowManager,
       ModManager modManager
     ) {
         this.taskExecutorService = taskExecutorService;
         this.innerServer = innerServer;
+        this.httpClientProvider = httpClientProvider;
         this.terminalController = terminalController;
         this.thinkingFlowManager = thinkingFlowManager;
         this.modManager = modManager;
@@ -140,20 +146,24 @@ public class Main {
         );
 
 
-        TimerProxy.start(
+        var terminalFuture = TimerProxy.start(
           () -> {
               log.info("正在启动思维流...");
               this.thinkingFlowManager.initialize();
 
               log.info("正在启动网络服务...");
+              HttpClient.registerProvider(this.httpClientProvider);
               this.taskExecutorService.submit(this.innerServer::run, true);
 
+              // 启动终端
+              log.info("正在启动终端...");
+              return this.taskExecutorService.submit(this.terminalController::runCommandline, false);
           }, "启动用时：{}ms"
         );
 
-        // 启动终端
-        log.info("正在启动终端...");
+        // TODO: 启动Mod
+
         // 阻塞调用，直到终端退出
-        this.taskExecutorService.submit(this.terminalController::runCommandline, false).join();
+        terminalFuture.join();
     }
 }

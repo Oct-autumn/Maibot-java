@@ -32,6 +32,9 @@ dependencies {
     // Jackson for JSON parsing
     implementation("tools.jackson.core:jackson-databind:3.0.1")
 
+    // Hibernate for ORM
+    implementation("org.hibernate.orm:hibernate-core:7.1.3.Final")
+
     // Lombok for reducing boilerplate code
     compileOnly("org.projectlombok:lombok:1.18.42")
     annotationProcessor("org.projectlombok:lombok:1.18.42")

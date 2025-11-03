@@ -1,12 +1,12 @@
 package org.maibot.core.thinking;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
-import org.maibot.core.db.DatabaseService;
-import org.maibot.core.db.dao.InteractionEntity;
-import org.maibot.core.db.dao.InteractionGroup;
-import org.maibot.core.db.dao.InteractionStream;
 import org.maibot.core.ioc.Instance;
+import org.maibot.core.persistence.db.DatabaseServiceImpl;
 import org.maibot.core.util.TaskExecutorServiceImpl;
+import org.maibot.sdk.db.dao.InteractionEntity;
+import org.maibot.sdk.db.dao.InteractionGroup;
+import org.maibot.sdk.db.dao.InteractionStream;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -37,7 +37,7 @@ public class ThinkingFlowManager implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(ThinkingFlowManager.class);
 
     /* 单例资源区 */
-    private final DatabaseService         databaseService;
+    private final DatabaseServiceImpl     databaseService;
     private final TaskExecutorServiceImpl taskExecutorService;
 
     /* 运行资源区 */
@@ -45,7 +45,7 @@ public class ThinkingFlowManager implements DestroyableComponent {
     private final Map<String, ThinkingFlow> thinkingFlows = new ConcurrentHashMap<>();
 
     @AutoInject
-    private ThinkingFlowManager(DatabaseService databaseService, TaskExecutorServiceImpl taskExecutorService) {
+    private ThinkingFlowManager(DatabaseServiceImpl databaseService, TaskExecutorServiceImpl taskExecutorService) {
         this.databaseService = databaseService;
         this.taskExecutorService = taskExecutorService;
     }

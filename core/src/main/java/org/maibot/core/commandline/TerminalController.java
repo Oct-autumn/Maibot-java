@@ -15,12 +15,17 @@ import picocli.CommandLine;
 import picocli.shell.jline3.PicocliJLineCompleter;
 
 import java.io.IOException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 public class TerminalController implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(TerminalController.class);
 
     private final Terminal terminal;
+
+    private final ReentrantLock lock         = new ReentrantLock();
+    private final Condition     endCondition = lock.newCondition();
 
     private boolean        running;
     private CommandLine    cmd;
@@ -54,6 +59,21 @@ public class TerminalController implements DestroyableComponent {
                 break;
             }
         }
+
+        if (!this.running) {
+            return;
+        }
+
+        try {
+            // 无输入命令行的Fallback
+            // 阻塞当前线程，直到收到停止信号
+            lock.lock();
+            endCondition.await();
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public void closeTerminal() {
@@ -74,6 +94,12 @@ public class TerminalController implements DestroyableComponent {
      */
     public void stopCommandline() {
         this.running = false;
+        try {
+            lock.lock();
+            endCondition.signalAll();
+        } finally {
+            lock.unlock();
+        }
         LogConfig.setTerminalLineReader(null);
     }
 }

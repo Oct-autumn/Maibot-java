@@ -1,4 +1,4 @@
-package org.maibot.core.db.dao;
+package org.maibot.sdk.db.dao;
 
 import jakarta.persistence.*;
 import lombok.Getter;

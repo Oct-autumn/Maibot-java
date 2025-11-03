@@ -1,4 +1,4 @@
-package org.maibot.core.db.dao;
+package org.maibot.sdk.db.dao;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -21,7 +21,9 @@ public class InteractionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String platformId;
+    /// 平台名称
+    private String platform;
+    /// 平台用户ID
     private String platformUserId;
 
     @ManyToOne

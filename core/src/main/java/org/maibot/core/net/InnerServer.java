@@ -70,13 +70,13 @@ public class InnerServer implements DestroyableComponent {
         // 使用线程池，创建一个单线程的bossGroup和多线程的workerGroup
         this.bossGroup = new MultiThreadIoEventLoopGroup(
           1,
-          this.taskExecutorService.getExecutor(),
+          this.taskExecutorService.getVirtualExecutor(),
           tae -> NioIoHandler.newFactory().newHandler(tae)
         );
 
         this.workerGroup = new MultiThreadIoEventLoopGroup(
-          2,
-          this.taskExecutorService.getExecutor(),
+          4,
+          this.taskExecutorService.getVirtualExecutor(),
           tae -> NioIoHandler.newFactory().newHandler(tae)
         );
 

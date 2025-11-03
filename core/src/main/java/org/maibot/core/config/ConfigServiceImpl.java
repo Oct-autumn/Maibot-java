@@ -141,6 +141,55 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     }
 
     /**
+     * 移除一个配置命名空间
+     *
+     * @param namespace 命名空间
+     */
+    public void removeConfigNameSpace(String namespace) {
+        namespacedConfigs.remove(namespace);
+    }
+
+    /**
+     * 加载配置文件
+     *
+     * @param namespace           命名空间
+     * @param configClass         配置类
+     * @param configFileName      配置文件路径
+     * @param templateInputStream 模板文件路径
+     * @return 是否成功加载配置
+     */
+    public <T> boolean loadExtraConfig(
+      String namespace,
+      Class<T> configClass,
+      String configFileName,
+      InputStream templateInputStream
+    ) {
+        var configFilePath = Path.of(CONFIG_DIR, configFileName).toString();
+        File configFile = new File(configFilePath);
+        if (!configFile.exists()) {
+            this.createDefaultConfig(configFilePath, templateInputStream);
+            return false;
+        }
+
+        // 根据配置文件的文件名后缀选择解析器
+        if (configFile.getName().endsWith(".toml")) {
+            var tomlReader = new TomlMapper().readerFor(configClass)
+                                             .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            try {
+                T rawJsonMap = tomlReader.readValue(configFile);
+
+                this.putConfigNameSpace(namespace, objectMapper.valueToTree(rawJsonMap));
+            } catch (JacksonException e) {
+                throw new FatalError("Failed to parse config file '%s'.", configFilePath, e);
+            }
+        } else {
+            throw new FatalError("Unsupported config file format: '%s'. Only .toml is supported.", configFilePath);
+        }
+
+        return true;
+    }
+
+    /**
      * 获取原始的配置 JSON 节点
      * <p>访问语法：
      * <ul>
@@ -198,54 +247,6 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
         return current;
     }
 
-    /**
-     * 移除一个配置命名空间
-     *
-     * @param namespace 命名空间
-     */
-    public void removeConfigNameSpace(String namespace) {
-        namespacedConfigs.remove(namespace);
-    }
-
-    /**
-     * 加载配置文件
-     *
-     * @param namespace           命名空间
-     * @param configClass         配置类
-     * @param configFileName      配置文件路径
-     * @param templateInputStream 模板文件路径
-     * @return 是否成功加载配置
-     */
-    public <T> boolean loadExtraConfig(
-      String namespace,
-      Class<T> configClass,
-      String configFileName,
-      InputStream templateInputStream
-    ) {
-        var configFilePath = Path.of(CONFIG_DIR, configFileName).toString();
-        File configFile = new File(configFilePath);
-        if (!configFile.exists()) {
-            this.createDefaultConfig(configFilePath, templateInputStream);
-            return false;
-        }
-
-        // 根据配置文件的文件名后缀选择解析器
-        if (configFile.getName().endsWith(".toml")) {
-            var tomlReader = new TomlMapper().readerFor(configClass)
-                                             .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-            try {
-                T rawJsonMap = tomlReader.readValue(configFile);
-
-                this.putConfigNameSpace(namespace, objectMapper.valueToTree(rawJsonMap));
-            } catch (JacksonException e) {
-                throw new FatalError("Failed to parse config file '%s'.", configFilePath, e);
-            }
-        } else {
-            throw new FatalError("Unsupported config file format: '%s'. Only .toml is supported.", configFilePath);
-        }
-
-        return true;
-    }
 
     @Override
     public <T> T getConfig(String key, Class<T> clazz)

@@ -1,6 +1,5 @@
 package org.maibot.core.util;
 
-import lombok.Getter;
 import lombok.NonNull;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.sdk.TaskExecutorService;
@@ -22,9 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class TaskExecutorServiceImpl extends TaskExecutorService {
     private static final Logger log = LoggerFactory.getLogger(TaskExecutorServiceImpl.class);
 
-    @Getter
     private final ThreadPoolExecutor executor;
-    @Getter
     private final ExecutorService    virtualExecutor;
 
     @AutoInject
@@ -80,6 +77,14 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
               }
           }
         );
+    }
+
+    public ThreadPoolExecutor getExecutor() {
+        return executor;
+    }
+
+    public ExecutorService getVirtualExecutor() {
+        return virtualExecutor;
     }
 
     /**

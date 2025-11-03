@@ -65,9 +65,26 @@ tasks.test {
 }
 
 // Create build-inf.properties
-tasks.register("createBuildInf") {
+tasks.register("createBuildInfo") {
     val outputDir = file("src/main/resources/META-INF")
     val outputFile = file("$outputDir/build-inf.properties")
+
+    // Collect dependencies to include in build info (only implementation dependencies)
+    // These info are needed by the Launcher to download correct dependencies
+    val implDeps = configurations.findByName("implementation")
+        ?.allDependencies?.joinToString(",") { dep ->
+            when (dep) {
+                is ProjectDependency ->
+                    "project:${dep.path}"
+
+                else -> {
+                    val g = dep.group ?: ""
+                    val n = dep.name
+                    val v = dep.version ?: ""
+                    listOf(g, n, v).filter { it.isNotEmpty() }.joinToString(":")
+                }
+            }
+        } ?: ""
 
     val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
 
@@ -79,13 +96,14 @@ tasks.register("createBuildInf") {
             """
             version=$innerVersion
             buildTime=${Instant.now().epochSecond}
+            implDeps=$implDeps
         """.trimIndent()
         )
     }
 }
 
 tasks.named("processResources") {
-    dependsOn("createBuildInf")
+    dependsOn("createBuildInfo")
 }
 
 tasks.jar {

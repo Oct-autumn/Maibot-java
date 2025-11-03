@@ -2,8 +2,8 @@ package org.maibot.core.thinking;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.maibot.core.db.dao.InteractionStream;
-import org.maibot.core.db.dao.Message;
+import org.maibot.sdk.db.dao.InteractionStream;
+import org.maibot.sdk.db.dao.Message;
 import org.maibot.sdk.ioc.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

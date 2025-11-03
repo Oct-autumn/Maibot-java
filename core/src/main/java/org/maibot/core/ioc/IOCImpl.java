@@ -9,7 +9,7 @@ import org.maibot.sdk.ioc.IOC;
  * 不要在Core中直接使用此类，应通过@AutoInject或Instance类获取实例
  */
 @Component
-public class InstanceImpl implements IOC {
+public class IOCImpl implements IOC {
     @Override
     public <T> T get(Class<T> interfaceOrClass, String name) {
         return Instance.get(interfaceOrClass, name);

@@ -1,24 +1,24 @@
-package org.maibot.core.db.dao;
+package org.maibot.sdk.db.dao;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.util.List;
+
 @Entity
 @Getter
 @Setter
-@Table(name = "db_version")
-public class DatabaseVersion {
+@Table(name = "person")
+public class Person {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String version;
+    @OneToMany(mappedBy = "person", cascade = CascadeType.ALL)
+    private List<InteractionEntity> interactionEntities;
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp

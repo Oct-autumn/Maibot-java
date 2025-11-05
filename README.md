@@ -1,5 +1,10 @@
 # Maibot Java Edition (Maibot-JE)
 
+![Static Badge](https://img.shields.io/badge/OpenJDK-21%2B-blue?style=plastic&logo=openjdk)
+[![Static Badge](https://img.shields.io/badge/Core-v0.1.0--Alpha-blue?style=plastic)](./core)
+[![Static Badge](https://img.shields.io/badge/SDK-v0.1.0--Alpha-blue?style=plastic)](./sdk)
+[![Static Badge](https://img.shields.io/badge/Launcher-v0.1.0--Alpha-blue?style=plastic)](./launcher)
+
 Maibot 的 Java 重构版，推倒全部代码，重新设计，使用 Java 语言实现。
 
 > **[点击前往Python版仓库](https://github.com/MaiM-with-u/MaiBot)**
@@ -8,7 +13,7 @@ Maibot 的 Java 重构版，推倒全部代码，重新设计，使用 Java 语�
 > - 本仓库目前为技术验证，非官方重构版本。
 > - 早期原型阶段，功能不完整，**可能存在恶性bug**。
 
-## 运行环境
+## 开发环境
 
 - JDK 21
 - Gradle 8.14

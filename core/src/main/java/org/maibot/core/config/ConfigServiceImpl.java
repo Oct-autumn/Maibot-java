@@ -78,9 +78,7 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
         File configFile = new File(CORE_CONFIG_PATH);
         if (!configFile.exists()) {
             System.out.println("配置文件不存在，正在创建默认配置文件...");
-            try (var inputStream = this.getClass()
-                                       .getClassLoader()
-                                       .getResourceAsStream("/org/maibot/core/Config.template.toml")) {
+            try (var inputStream = getClass().getResourceAsStream("/org/maibot/core/config.template.toml")) {
                 if (inputStream == null) {
                     throw new FatalError("Default core config template not found in resources.");
                 }
@@ -247,7 +245,6 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
         return current;
     }
 
-
     @Override
     public <T> T getConfig(String key, Class<T> clazz)
     throws InvalidConfigPath {
@@ -258,6 +255,4 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
             throw new InvalidConfigPath("Failed to convert config value to class %s.", clazz.getName(), e);
         }
     }
-
-
 }

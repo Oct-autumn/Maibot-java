@@ -1,3 +1,3 @@
 rootProject.name = "Maibot-java"
-include("core", "sdk")
+include("core", "sdk", "launcher")
 

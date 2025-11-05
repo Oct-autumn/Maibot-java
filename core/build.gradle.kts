@@ -3,10 +3,10 @@ import java.time.Instant
 
 plugins {
     id("java")
-    id("com.gradleup.shadow") version "9.2.2"
 }
 
-group = "org.maibot.core"
+group = "org.maibot"
+description = "MaiBot Core"
 
 // Core Version
 // Update this version when releasing a new Core version
@@ -66,12 +66,9 @@ tasks.test {
 
 // Create build-inf.properties
 tasks.register("createBuildInfo") {
-    val outputDir = file("src/main/resources/META-INF")
-    val outputFile = file("$outputDir/build-inf.properties")
-
     // Collect dependencies to include in build info (only implementation dependencies)
     // These info are needed by the Launcher to download correct dependencies
-    val implDeps = configurations.findByName("implementation")
+    val implDeps1 = configurations.findByName("implementation")
         ?.allDependencies?.joinToString(",") { dep ->
             when (dep) {
                 is ProjectDependency ->
@@ -89,16 +86,34 @@ tasks.register("createBuildInfo") {
     val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
 
     doLast {
+        val outputDir = file("src/main/resources/META-INF")
+        val outputFile = file("$outputDir/build-inf.properties")
+
         if (!outputDir.exists()) {
             outputDir.mkdirs()
         }
         outputFile.writeText(
             """
             version=$innerVersion
+            artifactId=${this.project.group}:${this.project.name}:${this.project.version}
             buildTime=${Instant.now().epochSecond}
-            implDeps=$implDeps
+            implDeps=$implDeps1
         """.trimIndent()
         )
+    }
+}
+
+tasks.register("jarAndMove") {
+    dependsOn("jar")
+    doLast {
+        val jarTask = tasks.named("jar").get()
+        val outputDir = file("../launcher/run/.maibot-launcher")
+        if (!outputDir.exists()) {
+            outputDir.mkdirs()
+        }
+        jarTask.outputs.files.forEach { file ->
+            file.copyTo(file("$outputDir/${file.name}"), overwrite = true)
+        }
     }
 }
 
@@ -107,9 +122,12 @@ tasks.named("processResources") {
 }
 
 tasks.jar {
+    dependsOn(":sdk:jar")
     manifest {
         attributes["Main-Class"] = "org.maibot.core.Main"
     }
+    // TODO: Publish SDK as Maven Package
+    from(project(":sdk").tasks.named("jar").get().outputs.files.map { zipTree(it) })
 }
 
 // Calculate source code hash for build identification

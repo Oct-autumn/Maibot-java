@@ -40,8 +40,9 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("ClassCanBeRecord") // 抑制警告：可以转化为记录类
 @Component
-public class Main {
-    private static final Logger log = LoggerFactory.getLogger(Main.class);
+public class MaibotMain {
+    private static final Logger log     = LoggerFactory.getLogger(MaibotMain.class);
+    private static final String workDir = System.getProperty("user.dir");
 
     /* 单例资源区 */
     private final TaskExecutorServiceImpl taskExecutorService;
@@ -52,7 +53,7 @@ public class Main {
     private final ModManager              modManager;
 
     @AutoInject
-    public Main(
+    public MaibotMain(
       TaskExecutorServiceImpl taskExecutorService,
       InnerServer innerServer,
       HttpClientProviderImpl httpClientProvider,
@@ -79,6 +80,7 @@ public class Main {
 
         Thread.currentThread().setName("Main");
 
+        // 初始化IOC容器
         Instance.scanImplementations("org.maibot", Thread.currentThread().getContextClassLoader());
 
         var buildInfo = Instance.get(BuildInfo.class);
@@ -118,10 +120,10 @@ public class Main {
         shutdownThread.setName("Shutdown-Hook");
         Runtime.getRuntime().addShutdownHook(shutdownThread);
 
-        Main main = TimerProxy.start(() -> Instance.get(Main.class), "实例化主类用时：{}ms");
+        MaibotMain maibotMain = TimerProxy.start(() -> Instance.get(MaibotMain.class), "实例化主类用时：{}ms");
 
         try {
-            main.run();
+            maibotMain.run();
         } catch (IgnorableException e) {
             log.warn("未捕获的可忽略异常：{}", e.getMessage());
         } catch (FatalError e) {

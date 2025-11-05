@@ -1,8 +1,8 @@
 # Maibot Java Edition (Maibot-JE)
 
-**前往[Python版原始仓库](https://github.com/MaiM-with-u/MaiBot)**
+Maibot 的 Java 重构版，推倒全部代码，重新设计，使用 Java 语言实现。
 
-Maibot 的 Java 重构版，推倒 Python 版的全部代码，重新设计，使用 Java 语言实现。
+> **[点击前往Python版仓库](https://github.com/MaiM-with-u/MaiBot)**
 
 > [!WARNING]
 > - 本仓库目前为技术验证，非官方重构版本。
@@ -18,7 +18,8 @@ Maibot 的 Java 重构版，推倒 Python 版的全部代码，重新设计，�
 > [!WARNING]
 > 目前模块划分尚不完善，后续可能会有较大调整。
 
-- `org.maibot.core`：核心模块，包含 Maibot 的主要逻辑和功能；
+- `launcher`：启动器，负责启动和管理 Maibot-JE 实例。
+- `core`：核心模块，包含 Maibot 的主要逻辑和功能；
     - `cache`：缓存相关，用于加速数据库IO；
     - `cdi`：依赖注入相关，提供简易的IoC容器：
         - 提供依赖注入功能，简化组件间的依赖管理，减轻脑力负担；
@@ -41,14 +42,16 @@ Maibot 的 Java 重构版，推倒 Python 版的全部代码，重新设计，�
     - `thinking`: 逻辑模块，负责 Maibot 的思考和决策：
         - 并行思维流模块，对每个交互流独立并行处理。
     - `util`: 工具类，包含各种辅助功能。
-- `org.maibot.sdk`：SDK，为第三方开发者提供接口；
+- `sdk`：SDK，为第三方开发者提供接口；
+- `example_mods`：示例模组，展示如何使用 SDK 开发模组。
 
 ## 开源协议（License）
 
-本项目的代码分为两部分：
+本项目的代码使用了多种不同的开源协议：
 
+- Maibot-JE Launcher，采用GPL-3.0 许可证开源；（见 [Launcher README文件](./launcher/README.md)）
 - Maibot-JE CORE，采用 GPL-3.0 许可证开源；（见 [CORE README文件](./core/README.md)）
 - Maibot-JE SDK，采用 MIT 许可证开源；（见 [SDK README文件](./sdk/README.md)）
-- example_mods 目录下的示例模组，采用 MIT 许可证开源；
+- example_mods 目录下的示例模组采用 MIT 许可证开源；
 
-使用本项目代码时，请遵守相应的开源许可证要求。
+在使用本项目的代码时，请遵守相应的开源许可证要求。

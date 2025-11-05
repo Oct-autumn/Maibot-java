@@ -1,0 +1,59 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+    id("java")
+    id("com.gradleup.shadow") version "9.2.2"
+}
+
+group = "org.maibot"
+version = "0.1.0-Alpha"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // SLF4J and Logback for logging
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("ch.qos.logback:logback-classic:1.5.19")
+
+    // argparse4j for command-line argument parsing
+    implementation("net.sourceforge.argparse4j:argparse4j:0.9.0")
+
+    // Maven Resolver for running dependency download
+    implementation("org.apache.maven.resolver:maven-resolver-supplier-mvn4:2.0.13")
+
+    // JNA for native access
+    implementation("com.github.jnr:jnr-posix:3.1.21")
+}
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "org.maibot.launcher.LauncherMain"
+    }
+}
+
+tasks.shadowJar {
+    archiveBaseName.set("OMCL")
+    archiveClassifier.set("all")
+    archiveVersion.set(project.version.toString())
+}
+
+tasks.register("shadowJarAndMove") {
+    dependsOn("shadowJar")
+    doLast {
+        val shadowJar = tasks.named("shadowJar").get() as ShadowJar
+        val outputDir = file("run")
+        val outputFile = file("${outputDir}/OMCL-${project.version}.jar")
+        shadowJar.archiveFile.get().asFile.copyTo(outputFile, overwrite = true)
+        println("Shadow JAR created at: ${outputFile.absolutePath}")
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
+}

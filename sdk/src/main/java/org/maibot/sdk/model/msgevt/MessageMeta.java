@@ -3,6 +3,7 @@ package org.maibot.sdk.model.msgevt;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.netty.util.internal.UnstableApi;
 
 /**
  * 消息来源信息
@@ -25,7 +26,15 @@ public record MessageMeta(
         /// 群聊
         GROUP("GROUP"),
         /// 群临时会话
-        GROUP_TEMP("GROUP_TEMP");
+        ///
+        /// 不稳定API: 该类型消息可能不被所有平台支持
+        @UnstableApi
+        GROUP_TEMP("GROUP_TEMP"),
+        /// 群匿名消息
+        ///
+        /// 不稳定API: 该类型消息可能不被所有平台支持
+        @UnstableApi
+        GROUP_ANONYMOUS("GROUP_ANONYMOUS");
 
         private final String value;
 
@@ -39,6 +48,7 @@ public record MessageMeta(
                 case "PRIVATE" -> PRIVATE;
                 case "GROUP" -> GROUP;
                 case "GROUP_TEMP" -> GROUP_TEMP;
+                case "GROUP_ANONYMOUS" -> GROUP_ANONYMOUS;
                 default -> throw new IllegalArgumentException("Unknown MessageType value: " + value);
             };
         }

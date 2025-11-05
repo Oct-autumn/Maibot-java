@@ -32,9 +32,10 @@ public class SeqGenerator {
     public static Sequence nextSeq() {
         // 获取当前时间戳（秒）
         // 比较，若与上次发放的是同一时间戳，则自增计数器加一；
-        // - 若发生时间流逝，则重置自增计数器为0
-        // - 若发生时钟回拨，则阻塞直到时间超过为止
-        // - 若自增计数器溢出，则阻塞直到时间流逝为止
+        // - 若发生时间流逝，则重置自增计数器为0，并更新时间戳；
+        // - 若发生时钟回拨，则阻塞直到时间超过为止，然后继续发放序列号
+        // - 若自增计数器溢出，则阻塞直到时间流逝为止，然后重置自增计数器为0
+        // 返回由时间戳和自增计数组成的序列号
         AtomicReference<Sequence> seq = new AtomicReference<>();
         lastTimestamp.updateAndGet(prev -> {
             AtomicLong now = new AtomicLong(Instant.now().getEpochSecond());

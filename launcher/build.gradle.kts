@@ -1,4 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.security.MessageDigest
+import java.time.Instant
 
 plugins {
     id("java")
@@ -23,6 +25,12 @@ dependencies {
 
     // argparse4j for command-line argument parsing
     implementation("net.sourceforge.argparse4j:argparse4j:0.9.0")
+
+    // Semver4j for semantic versioning
+    implementation("org.semver4j:semver4j:6.0.0")
+
+    // Gson for JSON processing
+    implementation("com.google.code.gson:gson:2.13.2")
 
     // Maven Resolver for running dependency download
     implementation("org.apache.maven.resolver:maven-resolver-supplier-mvn4:2.0.13")
@@ -54,6 +62,49 @@ tasks.register("shadowJarAndMove") {
     }
 }
 
+// Create build-inf.properties
+tasks.register("createBuildInfo") {
+    val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
+
+    doLast {
+        val outputDir = file("src/main/resources/META-INF")
+        val outputFile = file("$outputDir/build-inf.properties")
+
+        if (!outputDir.exists()) {
+            outputDir.mkdirs()
+        }
+        outputFile.writeText(
+            """
+            version=$innerVersion
+            artifactId=${this.project.group}:${this.project.name}:${this.project.version}
+            buildTime=${Instant.now().epochSecond}
+        """.trimIndent()
+        )
+    }
+}
+
+tasks.named("processResources") {
+    dependsOn("createBuildInfo")
+}
+
 tasks.test {
     useJUnitPlatform()
+}
+
+// Calculate source code hash for build identification
+fun calcSrcHash(): String {
+    val srcDir = file("src/main/java")
+    val digest = MessageDigest.getInstance("SHA-256")
+
+    srcDir.walkTopDown().filter { it.isFile }.forEach { file ->
+        file.inputStream().use { fis ->
+            val buffer = ByteArray(1024)
+            var bytesRead: Int
+            while (fis.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+    }
+
+    return digest.digest().joinToString("") { "%02x".format(it) }
 }

@@ -20,7 +20,6 @@ package org.maibot.launcher;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
 import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.inf.ArgumentParser;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.DefaultArtifact;
@@ -31,6 +30,7 @@ import org.eclipse.aether.graph.DefaultDependencyNode;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.resolution.DependencyRequest;
+import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.resolution.DependencyResult;
 import org.maibot.launcher.resolver.ResolverBooter;
 import org.maibot.launcher.resolver.ResolverService;
@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -49,20 +48,17 @@ import java.util.jar.JarFile;
 
 public class LauncherMain {
     // Launcher工作目录
-    public static final  String LAUNCHER_WORK_DIR      = ".maibot-launcher";
+    public static final String LAUNCHER_WORK_DIR = ".maibot-launcher";
+
     private static final Logger log                    = LoggerFactory.getLogger("Launcher");
     // Maibot Core JAR 文件前缀
     private static final String MAIBOT_CORE_JAR_PREFIX = "core";
-    // Maibot Core 主类
-    private static final String MAIBOT_MAIN_CLASS      = "org.maibot.core.MaibotMain";
 
 
     public static void main(String[] args)
     throws IOException {
-        ArgumentParser parser = ArgumentParsers.newFor("Maibot-JE Launcher")
-                                               .build()
-                                               .defaultHelp(true)
-                                               .description("Launcher for Maibot-JavaEdition");
+        var parser = ArgumentParsers.newFor("Maibot-JE Launcher").build().defaultHelp(true).description(
+          "Launcher for Maibot-JavaEdition");
         parser.addArgument("--log-level")
               // 设置日志级别
               .help("Set the log level for the launcher (TRACE, DEBUG, INFO, WARN, ERROR, OFF)").setDefault("INFO");
@@ -72,31 +68,43 @@ public class LauncherMain {
 
         var ns = parser.parseArgsOrFail(args);
 
-        {
-            // 设置日志级别
-            String logLevel = ns.getString("log_level").toUpperCase();
-            var context = ((LoggerContext) LoggerFactory.getILoggerFactory()).getLogger("ROOT");
-            context.setLevel(Level.toLevel(logLevel));
+        try {
+            var buildInfo = new BuildInfo();
+            System.out.printf("<=== MaiBot-JE Launcher - %s ===>\n", buildInfo.coreVersion().getVersion());
+            System.out.printf("> Build Time: %s (UTC) <\n", buildInfo.getBuildTime());
+        } catch (Exception e) {
+            log.error("无法获取 Launcher 版本信息", e);
+            System.exit(1);
         }
+
+        // 配置日志系统
+        configLogger(ns.getString("log_level").toUpperCase());
 
         log.info("当前Java环境：{} {}", System.getProperty("java.version"), System.getProperty("java.vendor"));
 
-        Path workDirPath = Path.of(LAUNCHER_WORK_DIR);
+        var workDirPath = Path.of(LAUNCHER_WORK_DIR);
         log.info("Launcher工作目录：{}", workDirPath.toAbsolutePath());
 
         var coreJar = searchCoreJar(workDirPath);
         log.info("找到 Core JAR 文件: {}", coreJar.getAbsolutePath());
 
+        // MOD管理：同步运行MOD
+        var modList = ModManage.syncMods();
+
+        // 外部依赖解析与加载
         URL[] dependencyUrls;
         try (var resolverService = new ResolverService(LAUNCHER_WORK_DIR)) {
-            log.info("开始解析依赖...");
+            log.info("处理依赖中...");
 
-            DependencyNode rootNode = collectDependencies(
+            // 收集依赖
+            var rootNode = collectDependencies(
               coreJar,
+              modList,
               resolverService.repoSystem,
               resolverService.repoSession
             );
 
+            // 加载依赖
             dependencyUrls = loadDependencies(
               rootNode,
               resolverService.repoSystem,
@@ -105,47 +113,24 @@ public class LauncherMain {
             );
         }
 
-        // 创建URLClassLoader
-        try (URLClassLoader urlClassLoader = new URLClassLoader(
-          dependencyUrls,
-          LauncherMain.class.getClassLoader()
-        )) {
+        System.gc();    // 主动GC，释放内存
+
+        // 创建URL类加载器并启动 Maibot Core
+        try (var urlClassLoader = new URLClassLoader(dependencyUrls, LauncherMain.class.getClassLoader())) {
             // 设置当前线程的上下文类加载器
             Thread.currentThread().setContextClassLoader(urlClassLoader);
 
-            launchMaibotCore(urlClassLoader, ns.getList("to_core"));
+            CoreBooter.launchMaibotCore(urlClassLoader, modList);
         } finally {
             // 恢复上下文类加载器
             Thread.currentThread().setContextClassLoader(LauncherMain.class.getClassLoader());
         }
     }
 
-    private static void launchMaibotCore(URLClassLoader urlClassLoader, List<Object> toCoreArgsList) {
-        String[] toCoreArgs = new String[toCoreArgsList.size()];
-        for (int i = 0; i < toCoreArgsList.size(); i++) {
-            toCoreArgs[i] = (String) toCoreArgsList.get(i);
-        }
-
-        log.info("引导 Maibot Core 启动...");
-        System.out.print("\n".repeat(2));
-
-        try {
-            // 使用反射调用Maibot Core的主类
-            var mainClass = urlClassLoader.loadClass(MAIBOT_MAIN_CLASS);
-            var mainMethod = mainClass.getMethod("main", String[].class);
-            try {
-                // 调用 Maibot Core 的主方法
-                mainMethod.invoke(null, (Object) toCoreArgs);
-            } catch (InvocationTargetException e) {
-                // Maibot Core 的主方法抛出的错误
-                log.error("Maibot Core 运行时发生错误", e);
-                System.exit(1);
-            }
-        } catch (ReflectiveOperationException e) {
-            // 其他反射相关错误
-            log.error("启动 Maibot Core 时发生错误，已终止启动", e);
-            System.exit(1);
-        }
+    private static void configLogger(String logLevel) {
+        // 设置日志级别
+        var context = ((LoggerContext) LoggerFactory.getILoggerFactory()).getLogger("ROOT");
+        context.setLevel(Level.toLevel(logLevel));
     }
 
     private static URL[] loadDependencies(
@@ -154,15 +139,14 @@ public class LauncherMain {
       RepositorySystemSession.CloseableSession repoSession,
       File coreJar
     ) {
-        DependencyRequest dependencyRequest = new DependencyRequest(
-          rootNode, (node, parents) -> true
-        );
+        var dependencyRequest = new DependencyRequest(rootNode, null);
+
+        log.info("加载依赖中...");
 
         DependencyResult dependencyResult;
         try {
-            log.info("开始加载依赖...");
             dependencyResult = repoSystem.resolveDependencies(repoSession, dependencyRequest);
-        } catch (Exception e) {
+        } catch (DependencyResolutionException e) {
             log.error("加载依赖时发生错误，已终止启动", e);
             System.exit(1);
             throw new RuntimeException(e); // 永远不会执行到这里
@@ -170,7 +154,7 @@ public class LauncherMain {
 
         var artifactResults = dependencyResult.getArtifactResults();
 
-        Set<URL> artifactUrlSet = new HashSet<>();
+        var artifactUrlSet = new HashSet<URL>(artifactResults.size());
 
         try {
             var url = coreJar.toURI().toURL();
@@ -201,26 +185,29 @@ public class LauncherMain {
 
     private static DependencyNode collectDependencies(
       File coreJar,
+      List<String> modList,
       RepositorySystem repoSystem,
       RepositorySystemSession.CloseableSession repoSession
     )
     throws IOException {
+        log.info("收集依赖中...");
+
         Set<DependencyNode> dependencies = new HashSet<>();
 
-        collectDependenciesFromJar(coreJar, dependencies, repoSystem, repoSession);
+        if (collectDependenciesFromJar(coreJar, dependencies, repoSystem, repoSession)) {
+            log.error("Maibot Core JAR 文件的依赖解析失败，请检查对应的日志信息以获取更多细节");
+            System.exit(1);
+        }
 
         // 读取JAR包，"META-INF/build-inf.properties"文件，获取依赖列表
         var modsDirPath = Path.of("mods");
         Utils.ensureDirExists(modsDirPath);
 
-        List<File> modsFindResult = Utils.findFiles(modsDirPath, "^.+\\.jar$");
-        log.info("找到 {} 个 Mod JAR 文件", modsFindResult.size());
-
-        List<String> exceptionMods = new ArrayList<>();
-        for (File modJar : modsFindResult) {
-            log.debug("正在收集 Mod JAR 文件 {} 的依赖...", modJar.getAbsolutePath());
-            if (!collectDependenciesFromJar(modJar, dependencies, repoSystem, repoSession)) {
-                exceptionMods.add(modJar.getAbsolutePath());
+        var exceptionMods = new ArrayList<String>();
+        for (String modJar : modList) {
+            log.debug("正在收集 Mod JAR 文件 {} 的依赖...", modJar);
+            if (collectDependenciesFromJar(new File(modJar), dependencies, repoSystem, repoSession)) {
+                exceptionMods.add(modJar);
             }
         }
         if (!exceptionMods.isEmpty()) {
@@ -231,7 +218,7 @@ public class LauncherMain {
             System.exit(1);
         }
 
-        DependencyNode rootNode = new DefaultDependencyNode((Dependency) null);
+        var rootNode = new DefaultDependencyNode((Dependency) null);
         rootNode.setChildren(dependencies.stream().toList());
         rootNode.setData("A-ID", "[root]");
 
@@ -254,7 +241,7 @@ public class LauncherMain {
             var buildInfoEntry = jar.getJarEntry("META-INF/build-inf.properties");
             if (buildInfoEntry == null) {
                 log.error("在 JAR '{}' 中未找到 META-INF/build-inf.properties", jarFile.getAbsolutePath());
-                return false;
+                return true;
             }
 
             var buildInfoStream = jar.getInputStream(buildInfoEntry);
@@ -264,17 +251,17 @@ public class LauncherMain {
             var deps = properties.getProperty("implDeps");
             if (deps == null) {
                 log.warn("JAR '{}' 中的 build-inf.properties 未定义 implDeps 属性", jarFile.getAbsolutePath());
-                return false;
+                return true;
             }
             if (deps.isBlank()) {
                 log.warn("JAR '{}' 中的 build-inf.properties 定义的 implDeps 属性为空", jarFile.getAbsolutePath());
-                return true; // 没有依赖
+                return false; // 没有依赖
             }
 
             var artifactId = properties.getProperty("artifactId");
             if (artifactId == null || artifactId.isBlank()) {
                 log.error("JAR '{}' 中的 build-inf.properties 未定义 artifactId 属性", jarFile.getAbsolutePath());
-                return false;
+                return true;
             }
 
             var childrenDepsCoords = new HashSet<String>();
@@ -290,27 +277,22 @@ public class LauncherMain {
                 childrenDepsCoords.add(dep);
             }
 
-            CollectRequest collectRequest = new CollectRequest()
-              .setDependencies(
-                childrenDepsCoords.stream().map(coords -> new Dependency(
-                  new DefaultArtifact(coords),
-                  "compile"
-                )).toList()
-              )
-              .setRepositories(ResolverBooter.newRemoteRepositories());
+            var collectRequest = new CollectRequest().setDependencies(childrenDepsCoords.stream()
+                                                                                        .map(coords -> new Dependency(
+                                                                                          new DefaultArtifact(coords),
+                                                                                          "compile"
+                                                                                        ))
+                                                                                        .toList()).setRepositories(
+              ResolverBooter.newRemoteRepositories());
 
             CollectResult collectResult;
             try {
                 collectResult = system.collectDependencies(session, collectRequest);
             } catch (DependencyCollectionException e) {
-                log.error(
-                  "收集 JAR '{}' 的依赖时发生异常",
-                  jarFile.getAbsolutePath(),
-                  e
-                );
+                log.error("收集 JAR '{}' 的依赖时发生异常", jarFile.getAbsolutePath(), e);
 
                 if (e.getResult() == null) {
-                    return false;
+                    return true;
                 }
                 collectResult = e.getResult();
             }
@@ -321,15 +303,12 @@ public class LauncherMain {
             rootNode.setData("A-ID", artifactId);
 
             dependencySet.add(rootNode);
-            return true;
+            return false;
         }
     }
 
     private static File searchCoreJar(Path workDirPath) {
-        List<File> coreFindResult = Utils.findFiles(
-          workDirPath,
-          String.format("^%s-.+\\.jar$", MAIBOT_CORE_JAR_PREFIX)
-        );
+        var coreFindResult = Utils.findFiles(workDirPath, String.format("^%s-.+\\.jar$", MAIBOT_CORE_JAR_PREFIX));
 
         if (coreFindResult.isEmpty()) {
             log.error(

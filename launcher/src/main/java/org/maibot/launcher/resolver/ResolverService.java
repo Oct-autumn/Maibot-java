@@ -19,7 +19,7 @@ public class ResolverService implements AutoCloseable {
 
         var localRepoPath = Path.of(workDir, "libs");
         Utils.ensureDirExists(localRepoPath);
-        log.info("本地仓库路径: {}", localRepoPath);
+        log.debug("本地仓库路径: {}", localRepoPath);
         this.repoSession = ResolverBooter.newRepositorySystemSession(
           this.repoSystem,
           localRepoPath.toString()

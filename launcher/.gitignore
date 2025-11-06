@@ -42,5 +42,8 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Build files ###
+src/main/resources/META-INF/build-inf.properties
+
 ### Run files ###
 run/

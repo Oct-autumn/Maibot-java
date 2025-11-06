@@ -39,7 +39,7 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     /// 命名空间由字母、数字、下划线组成，不能包含空格；
     /// 字段路径由字母、数字、下划线和点号组成，不能包含空格。
     private static final Pattern KEY_SPLIT_PATTERN  = Pattern.compile(
-      "(?:(?<namespace>[a-zA-Z0-9_]+):)?(?<path>[a-zA-Z0-9_.*]+)$"
+      "(?:(?<namespace>[a-zA-Z0-9_-]+):)?(?<path>[a-zA-Z0-9_.*-]+)$"
     );
     private static final Pattern FIELD_PATH_PATTERN = Pattern.compile(
       "^[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)*$"

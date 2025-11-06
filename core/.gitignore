@@ -41,10 +41,3 @@ bin/
 
 ### Build Files ###
 src/main/resources/META-INF/build-inf.properties
-
-### Running Files ###
-logs/
-data/
-mods/
-config/
-config.toml

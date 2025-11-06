@@ -38,11 +38,14 @@ import org.maibot.sdk.net.HttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 @SuppressWarnings("ClassCanBeRecord") // 抑制警告：可以转化为记录类
 @Component
 public class MaibotMain {
-    private static final Logger log     = LoggerFactory.getLogger(MaibotMain.class);
-    private static final String workDir = System.getProperty("user.dir");
+    public static final AtomicReference<LaunchArgs> LAUNCH_ARGS = new AtomicReference<>();
+
+    private static final Logger log = LoggerFactory.getLogger(MaibotMain.class);
 
     /* 单例资源区 */
     private final TaskExecutorServiceImpl taskExecutorService;
@@ -79,6 +82,13 @@ public class MaibotMain {
         // 所有未捕获异常均视为致命错误，记录日志后终止运行
 
         Thread.currentThread().setName("Main");
+
+        // 解析命令行参数
+        if (args.length != 1) {
+            System.err.println("请检查启动参数数量，仅允许传入一个JSON格式的字符串参数");
+            System.exit(1);
+        }
+        LAUNCH_ARGS.set(LaunchArgs.parse(args[0]));
 
         // 初始化IOC容器
         Instance.scanImplementations("org.maibot", Thread.currentThread().getContextClassLoader());

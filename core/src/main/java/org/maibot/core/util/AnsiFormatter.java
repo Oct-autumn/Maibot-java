@@ -1,4 +1,4 @@
-package org.maibot.core.log;
+package org.maibot.core.util;
 
 import org.jline.jansi.Ansi;
 
@@ -195,12 +195,17 @@ public class AnsiFormatter {
             case "STRIKETHROUGH_ON" -> ansi.a(Ansi.Attribute.STRIKETHROUGH_ON);
             case "STRIKETHROUGH_OFF" -> ansi.a(Ansi.Attribute.STRIKETHROUGH_OFF);
             default -> {
-                if (code.matches(HEX_PREFIX + "[0-9a-fA-F]{6}")
-                  || code.matches("FG" + HEX_PREFIX + "[0-9a-fA-F]{6}")) {
+                if (code.matches(HEX_PREFIX + "[0-9a-fA-F]{6}")) {
                     // 24-bit color
                     int r = Integer.parseInt(code.substring(1, 3), 16);
                     int g = Integer.parseInt(code.substring(3, 5), 16);
                     int b = Integer.parseInt(code.substring(5, 7), 16);
+                    ansi.fgRgb(r, g, b);
+                } else if (code.matches("FG" + HEX_PREFIX + "[0-9a-fA-F]{6}")) {
+                    // 24-bit color
+                    int r = Integer.parseInt(code.substring(3, 5), 16);
+                    int g = Integer.parseInt(code.substring(5, 7), 16);
+                    int b = Integer.parseInt(code.substring(7, 9), 16);
                     ansi.fgRgb(r, g, b);
                 } else if (code.matches("BG" + HEX_PREFIX + "[0-9a-fA-F]{6}")) {
                     // 24-bit background color

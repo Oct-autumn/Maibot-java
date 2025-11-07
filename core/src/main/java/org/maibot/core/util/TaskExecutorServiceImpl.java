@@ -1,5 +1,6 @@
 package org.maibot.core.util;
 
+import lombok.Getter;
 import lombok.NonNull;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.sdk.TaskExecutorService;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -21,8 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class TaskExecutorServiceImpl extends TaskExecutorService {
     private static final Logger log = LoggerFactory.getLogger(TaskExecutorServiceImpl.class);
 
-    private final ThreadPoolExecutor executor;
-    private final ExecutorService    virtualExecutor;
+    private volatile boolean            isStarted      = false;
+    private volatile boolean            isShuttingDown = false;
+    private volatile boolean            isClosed       = false;
+    @Getter
+    private final    ThreadPoolExecutor executor;
+    @Getter
+    private final    ExecutorService    virtualExecutor;
 
     @AutoInject
     public TaskExecutorServiceImpl(ModManager modManager) {
@@ -44,10 +51,7 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
               public Thread newThread(@NonNull Runnable r) {
                   Thread thread = new Thread(r);
                   thread.setName("T-" + threadNumber.getAndIncrement());
-
-                  if (modManager.getModClassLoader() != null) {
-                      thread.setContextClassLoader(modManager.getModClassLoader());
-                  }
+                  thread.setContextClassLoader(modManager.getModClassLoader());
 
                   return thread;
               }
@@ -68,10 +72,7 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
                       }
                   });
                   thread.setName("VT-" + threadId);
-
-                  if (modManager.getModClassLoader() != null) {
-                      thread.setContextClassLoader(modManager.getModClassLoader());
-                  }
+                  thread.setContextClassLoader(modManager.getModClassLoader());
 
                   return thread;
               }
@@ -79,12 +80,8 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
         );
     }
 
-    public ThreadPoolExecutor getExecutor() {
-        return executor;
-    }
-
-    public ExecutorService getVirtualExecutor() {
-        return virtualExecutor;
+    public void start() {
+        this.isStarted = true;
     }
 
     /**
@@ -97,6 +94,18 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
     @Override
     public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT) {
         var future = new CompletableFuture<T>();
+
+        if (isShuttingDown) {
+            future.completeExceptionally(
+              new RejectedExecutionException("任务执行器正在关闭，无法接受新任务")
+            );
+            return future;
+        } else if (!isStarted || isClosed) {
+            future.completeExceptionally(
+              new RejectedExecutionException("任务执行器未启动，无法接受任务")
+            );
+            return future;
+        }
 
         var wrappedTask = new Runnable() {
             @Override
@@ -134,6 +143,18 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
     public CompletableFuture<Object> submit(Runnable task, boolean virT) {
         var future = new CompletableFuture<>();
 
+        if (isShuttingDown) {
+            future.completeExceptionally(
+              new RejectedExecutionException("任务执行器正在关闭，无法接受新任务")
+            );
+            return future;
+        } else if (!isStarted || isClosed) {
+            future.completeExceptionally(
+              new RejectedExecutionException("任务执行器未启动，无法接受任务")
+            );
+            return future;
+        }
+
         var wrappedTask = new Runnable() {
             @Override
             public void run() {
@@ -166,8 +187,10 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
     @Override
     public void preDestroy() {
         try {
+            this.isShuttingDown = true;
             this.executor.shutdown();
             this.virtualExecutor.shutdown();
+            this.isClosed = true;
         } catch (Exception e) {
             log.error("关闭任务执行器时发生错误", e);
         }

@@ -4,6 +4,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import lombok.Setter;
 import org.jline.reader.LineReader;
+import org.maibot.core.util.AnsiFormatter;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Value;
 

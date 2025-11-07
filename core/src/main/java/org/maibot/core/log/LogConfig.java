@@ -6,11 +6,15 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
+import ch.qos.logback.core.rolling.RollingFileAppender;
+import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
+import ch.qos.logback.core.util.FileSize;
 import org.jline.reader.LineReader;
 import org.maibot.core.config.MainConfig;
 import org.maibot.core.ioc.Instance;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -46,7 +50,7 @@ public class LogConfig {
 
         if (!conf.file().level().equalsIgnoreCase("OFF")) {
             // 确保日志目录存在
-            java.io.File logDir = new java.io.File(conf.file().logDir());
+            File logDir = new File("logs");
             if (!logDir.exists() && logDir.mkdirs()) {
                 System.out.println("创建日志目录: " + logDir.getAbsolutePath());
             }
@@ -93,10 +97,21 @@ public class LogConfig {
       LoggerContext context,
       MainConfig.Log.FileLogSettings conf
     ) {
-        FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
+        var fileAppender = new RollingFileAppender<ILoggingEvent>();
         fileAppender.setName("file");
         fileAppender.setContext(context);
-        fileAppender.setFile(conf.logDir() + "/maibot.log");
+        fileAppender.setFile("logs/latest.log");
+
+        {
+            TimeBasedRollingPolicy<ILoggingEvent> rollingPolicy = new TimeBasedRollingPolicy<>();
+            rollingPolicy.setContext(context);
+            rollingPolicy.setParent(fileAppender);
+            rollingPolicy.setFileNamePattern("logs/maibot-%d{yyyy-MM-dd}.log");
+            rollingPolicy.setMaxHistory(conf.maxRollingFiles());
+            rollingPolicy.setTotalSizeCap(new FileSize(FileSize.MB_COEFFICIENT * conf.maxTotalSizeMb()));
+            rollingPolicy.start();
+            fileAppender.setRollingPolicy(rollingPolicy);
+        }
 
         {
             PatternLayoutEncoder fileEncoder = new PatternLayoutEncoder();

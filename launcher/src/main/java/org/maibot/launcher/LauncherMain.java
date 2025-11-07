@@ -116,7 +116,7 @@ public class LauncherMain {
         System.gc();    // 主动GC，释放内存
 
         // 创建URL类加载器并启动 Maibot Core
-        try (var urlClassLoader = new URLClassLoader(dependencyUrls, LauncherMain.class.getClassLoader())) {
+        try (var urlClassLoader = new URLClassLoader(dependencyUrls, ClassLoader.getSystemClassLoader())) {
             // 设置当前线程的上下文类加载器
             Thread.currentThread().setContextClassLoader(urlClassLoader);
 

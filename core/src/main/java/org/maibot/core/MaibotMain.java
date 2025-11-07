@@ -26,6 +26,8 @@ import org.maibot.core.modloader.ModManager;
 import org.maibot.core.net.InnerServer;
 import org.maibot.core.net.client.HttpClientProviderImpl;
 import org.maibot.core.thinking.ThinkingFlowManager;
+import org.maibot.core.util.AnsiFormatter;
+import org.maibot.core.util.EasterEgg;
 import org.maibot.core.util.TaskExecutorServiceImpl;
 import org.maibot.core.util.TimerProxy;
 import org.maibot.sdk.TaskExecutorService;
@@ -114,18 +116,19 @@ public class MaibotMain {
 
         var configService = Instance.get(ConfigService.class);
         LogConfig.configure(configService.getConfig("log", MainConfig.Log.class));
-        System.out.println("日志系统初始化完成");
+        log.info("日志系统初始化完成");
         // <!-- 从此处开始可以正常使用Logger -->
 
-        Instance.get(TaskExecutorService.class);
-        log.info("线程池初始化完成");
-        // <!-- 从此处开始可以正常使用线程池 -->
+        // 彩蛋
+        System.out.println(AnsiFormatter.render("\n@{FG#FFB6C1 {}}@\n", EasterEgg.randEly()));
 
         log.info("注册关闭钩子...");
         Thread shutdownThread = new Thread(() -> {
             log.warn("正在关闭 MaiBot...");
             Instance.close();
             log.info("MaiBot 已成功关闭");
+            // 彩蛋
+            System.out.println(AnsiFormatter.render("\n> @{FG#FFB6C1 See you tomorrow}@\n"));
         });
         shutdownThread.setName("Shutdown-Hook");
         Runtime.getRuntime().addShutdownHook(shutdownThread);
@@ -153,13 +156,16 @@ public class MaibotMain {
         TimerProxy.start(
           () -> {
               log.info("正在加载Mod...");
-              this.modManager.loadMods();
+              this.modManager.loadMods(LAUNCH_ARGS.get().modList());
           }, "加载Mod用时：{}ms"
         );
 
-
         var terminalFuture = TimerProxy.start(
           () -> {
+              log.info("正在启动任务执行器...");
+              taskExecutorService.start();
+              // <!-- 从此处开始可以正常使用来自IoC的线程池 -->
+
               log.info("正在启动思维流...");
               this.thinkingFlowManager.initialize();
 

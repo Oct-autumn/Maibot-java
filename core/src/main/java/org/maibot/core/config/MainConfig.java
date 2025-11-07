@@ -39,7 +39,8 @@ public record MainConfig(
         public record FileLogSettings(
           @JsonProperty(value = "level", required = true) String level,
           @JsonProperty(value = "filter_rule", required = true) List<String> filterRule,
-          @JsonProperty(value = "log_dir", required = true) String logDir
+          @JsonProperty(value = "max_rolling_files", required = true) Integer maxRollingFiles,
+          @JsonProperty(value = "max_total_size_mb", required = true) Integer maxTotalSizeMb
         ) {
         }
     }

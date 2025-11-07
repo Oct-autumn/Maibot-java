@@ -9,6 +9,7 @@ import org.maibot.sdk.ioc.Component;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class ImplManager {
     private final Map<Class<?>, ImplMap> implementations = new ConcurrentHashMap<>();
@@ -56,8 +57,7 @@ final class ImplManager {
                                () -> new FatalError(
                                  "Component annotation not found on class %s during registration. This shouldn't happen.",
                                  clazz.getName()
-                               )
-                             );
+                               ));
             }
 
             String name = anno.name();
@@ -79,49 +79,65 @@ final class ImplManager {
     }
 
     void putImpl(Class<?> interfaceOrClass, String name, Class<?> implClass, boolean primary) {
-        var implMap = implementations.computeIfAbsent(interfaceOrClass, clazz -> new ImplMap());
-        synchronized (implMap) {    // 同步以防止并发修改
-            if (implMap.impls.containsKey(name) && implMap.impls.get(name) != implClass) {
-                // 重复的实现名称
-                throw new FatalError(
-                  "Duplicate implementation name '%s' found for %s: %s and %s",
-                  name,
-                  interfaceOrClass.getName(),
-                  implMap.impls.get(name).getName(),
-                  implClass.getName()
-                );
-            }
-            implMap.impls.put(name, implClass);
-            if (primary) {
-                if (implMap.primary != null && implMap.primary != implClass) {
-                    // 重复的主实现
-                    throw new FatalError(
-                      "Multiple primary implementations found for %s: %s and %s",
-                      interfaceOrClass.getName(),
-                      implMap.primary.getName(),
-                      implClass.getName()
-                    );
-                }
-                implMap.primary = implClass;
-            }
-        }
+        implementations.compute(
+          interfaceOrClass, (clazz, map) -> {
+              if (map == null) {
+                  map = new ImplMap();
+              }
+              if (map.impls.containsKey(name) && map.impls.get(name) != implClass) {
+                  // 重复的实现名称
+                  throw new FatalError(
+                    "Duplicate implementation name '%s' found for %s: %s and %s",
+                    name,
+                    interfaceOrClass.getName(),
+                    map.impls.get(name).getName(),
+                    implClass.getName()
+                  );
+              }
+              map.impls.put(name, implClass);
+              if (primary) {
+                  if (map.primary != null && map.primary != implClass) {
+                      // 重复的主实现
+                      throw new FatalError(
+                        "Multiple primary implementations found for %s: %s and %s",
+                        interfaceOrClass.getName(),
+                        map.primary.getName(),
+                        implClass.getName()
+                      );
+                  }
+                  map.primary = implClass;
+              }
+              return map;
+          }
+        );
     }
 
     Class<?> getImpl(Class<?> interfaceOrClass, String name) {
-        var implMap = implementations.get(interfaceOrClass);
-        if (implMap == null) {
-            // 没有任何实现
-            throw new ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName());
-        } else if (!implMap.impls.containsKey(name)) {
-            // 没有指定名称的实现
-            throw new ClassNoImplementation(
-              "No implementation named '%s' found for %s",
-              name,
-              interfaceOrClass.getName()
-            );
+        AtomicReference<Object> ret = new AtomicReference<>();
+        implementations.compute(
+          interfaceOrClass, (clazz, map) -> {
+              if (map == null) {
+                  // 没有任何实现
+                  ret.set(new ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName()));
+              } else if (!map.impls.containsKey(name)) {
+                  // 没有指定名称的实现
+                  ret.set(new ClassNoImplementation(
+                    "No implementation named '%s' found for %s",
+                    name,
+                    interfaceOrClass.getName()
+                  ));
+              } else {
+                  // 返回指定名称的实现
+                  ret.set(map.impls.get(name));
+              }
+              return map;
+          }
+        );
+
+        if (ret.get() instanceof ClassNoImplementation e) {
+            throw e;
         } else {
-            // 返回指定名称的实现
-            return implMap.impls.get(name);
+            return (Class<?>) ret.get();
         }
     }
 

@@ -1,13 +1,10 @@
 package org.maibot.sdk.mod;
 
+/**
+ * Mod基类，所有Mod均需继承此类
+ *
+ */
 public abstract class Mod {
-    /**
-     * Mod加载时调用
-     */
-    public void onLoad() {
-        // Do nothing by default
-    }
-
     /**
      * Mod启用时调用
      */

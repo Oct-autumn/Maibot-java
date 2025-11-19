@@ -6,6 +6,7 @@
     <module name="Maibot-java.launcher.main" />
     <option name="PROGRAM_PARAMETERS" value="--log-level INFO" />
     <target name="@@@LOCAL@@@" />
+    <option name="VM_PARAMETERS" value="-Xms512m -Xmx1g" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/launcher/run" />
     <method v="2">
       <option name="Gradle.BeforeRunTask" enabled="false" tasks="jarAndMove" externalProjectPath="$PROJECT_DIR$/core" vmOptions="" scriptParameters="" />

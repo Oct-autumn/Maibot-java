@@ -5,7 +5,10 @@ import org.maibot.sdk.ioc.DestroyableComponent;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
-public abstract class TaskExecutorService implements DestroyableComponent {
+/**
+ * 任务执行服务接口
+ */
+public abstract class TaskExecuteService implements DestroyableComponent {
     /**
      * 提交任务到执行器
      *

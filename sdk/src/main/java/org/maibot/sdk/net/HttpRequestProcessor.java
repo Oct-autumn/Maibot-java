@@ -5,16 +5,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponse;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class HttpRequestProcessor {
-    protected final Logger     log;
-    @Getter
-    private final   HttpMethod method;
-    @Getter
-    private final   String     path;
+    protected final Logger log;
+
+    private final HttpMethod method;
+
+    private final String path;
 
 
     public HttpRequestProcessor(HttpMethod method, String path, Class<?> loggerClass) {
@@ -25,6 +24,14 @@ public abstract class HttpRequestProcessor {
         this.method = method;
         this.path = path;
         this.log = logger;
+    }
+
+    public HttpMethod getMethod() {
+        return method;
+    }
+
+    public String getPath() {
+        return path;
     }
 
     public void process(ChannelHandlerContext ctx, FullHttpRequest req)

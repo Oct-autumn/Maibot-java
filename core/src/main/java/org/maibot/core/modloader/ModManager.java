@@ -112,9 +112,9 @@ public class ModManager implements DestroyableComponent {
                 modId = metaData.modId;
 
                 try (var scanResult = new ClassGraph().overrideClassLoaders(urlClassLoader)
-                                                      .acceptPackages(metaData.packageName)
-                                                      .enableAllInfo()
-                                                      .scan()) {
+                  .acceptPackages(metaData.packageName)
+                  .enableAllInfo()
+                  .scan()) {
                     var mainClassList = scanResult.getClassesWithAnnotation(ModMainClass.class);
                     if (mainClassList.size() != 1) {
                         throw new UnignorableException(
@@ -246,7 +246,6 @@ public class ModManager implements DestroyableComponent {
                         var modDescription = modClazz.getAnnotation(ModMainClass.class).description();
                         Object modInstance = Instance.get(modClazz);
                         if (modInstance instanceof Mod mod) {
-                            mod.onLoad();
                             node.loaded(mod, modAuthor, modDescription, modClassLoader);
                             log.debug("成功加载Mod: {}", node.modId());
                         } else {
@@ -265,22 +264,37 @@ public class ModManager implements DestroyableComponent {
 
             // 收集各mod的类加载器
             List<ClassLoader> modClassLoaders = this.modTree.resolveTopologicalOrder()
-                                                            .stream()
-                                                            .filter(node -> !node.modId().equals("sdk"))
-                                                            .map(node -> {
-                                                                try {
-                                                                    return node.onLoadData().classLoaderFuture().get();
-                                                                } catch (InterruptedException | ExecutionException e) {
-                                                                    throw new FatalError(
-                                                                      "获取Mod %s 的类加载器时发生异常",
-                                                                      node.modId(),
-                                                                      e
-                                                                    );
-                                                                }
-                                                            })
-                                                            .toList();
+              .stream()
+              .filter(node -> !node.modId().equals("sdk"))
+              .map(node -> {
+                  try {
+                      return node.onLoadData().classLoaderFuture().get();
+                  } catch (InterruptedException | ExecutionException e) {
+                      throw new FatalError(
+                        "获取Mod %s 的类加载器时发生异常",
+                        node.modId(),
+                        e
+                      );
+                  }
+              })
+              .toList();
             this.modClassLoaderRef.set(new ModClassLoader(modClassLoaders));
         }
+    }
+
+    public void enableMods() {
+        this.modTree.resolveTopologicalOrder().forEach(node -> {
+            if (node.modId().equals("sdk")) return; // 跳过SDK节点
+            var loadedData = node.loadedData();
+            if (loadedData != null) {
+                try {
+                    loadedData.modInstance().onEnable();
+                    log.debug("成功启用Mod: {}", node.modId());
+                } catch (Throwable e) {
+                    log.error("启用Mod {} 时发生异常", node.modId(), e);
+                }
+            }
+        });
     }
 
     @Override

@@ -5,12 +5,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.maibot.launcher.LauncherMain.LAUNCHER_WORK_DIR;
@@ -32,54 +31,52 @@ public class ModManage {
      * @return 返回处理完后运行目录下所有Mod文件的绝对路径列表
      */
     public static List<String> syncMods() {
-        var workDirMods = Utils.findFiles(Path.of(LAUNCHER_WORK_DIR, "mods"), ".*\\.jar");
-        var runDirMods = Utils.findFiles(Path.of("mods"), ".*\\.jar");
+        var workDirModFiles = Utils.findFiles(Path.of(LAUNCHER_WORK_DIR, "mods"), ".*\\.jar");
+        var runDirModFiles = Utils.findFiles(Path.of("mods"), ".*\\.jar");
 
-        Set<ModFile> workDirModSet = workDirMods.stream()
-                                                .map(ModFile::getIt)
-                                                .collect(Collectors.toSet());
-        Set<ModFile> runDirModSet = runDirMods.stream()
-                                              .map(ModFile::getIt)
-                                              .collect(Collectors.toSet());
+        var workDirMods = createMd5Map(workDirModFiles);
+        var runDirMods = createMd5Map(runDirModFiles);
 
-        // 计算新增和删除的Mod文件
-        Set<ModFile> modsToAdd = runDirModSet.stream()
-                                             .filter(mod -> !workDirModSet.contains(mod))
-                                             .collect(Collectors.toSet());
-        Set<ModFile> modsToRemove = workDirModSet.stream()
-                                                 .filter(mod -> !runDirModSet.contains(mod))
-                                                 .collect(Collectors.toSet());
-
-        // 处理新增的Mod文件
-        for (ModFile mod : modsToAdd) {
-            var sourceFilePath = mod.file.getPath();
-            var targetFile = Path.of(LAUNCHER_WORK_DIR, "mods", mod.md5 + ".jar");
-            try {
-                Files.copy(Path.of(sourceFilePath), targetFile);
-                log.info("已添加Mod: {}", mod.file.getName());
-            } catch (IOException e) {
-                log.error("添加Mod失败: {}", mod.file.getName(), e);
+        // 删除Mod文件
+        for (var workDirModMd5 : workDirMods.keySet()) {
+            if (!runDirMods.containsKey(workDirModMd5)) {
+                // 运行目录中不存在该Mod文件，进行删除
+                var modFile = workDirMods.get(workDirModMd5).file;
+                if (modFile.delete()) {
+                    log.debug("Deleted mod file: {}", modFile.getAbsolutePath());
+                    workDirMods.remove(workDirModMd5);
+                } else {
+                    log.warn("Failed to delete mod file: {}", modFile.getName());
+                }
             }
         }
 
-        // 处理删除的Mod文件
-        for (ModFile mod : modsToRemove) {
-            var targetFilePath = mod.file.toPath();
-            try {
-                Files.deleteIfExists(targetFilePath);
-                log.info("已删除Mod: {}", mod.file.getName());
-            } catch (IOException e) {
-                log.error("删除Mod失败: {}", mod.file.getName(), e);
+        // 新增Mod文件
+        for (var runDirModKey : runDirMods.keySet()) {
+            if (!workDirMods.containsKey(runDirModKey)) {
+                // 运行目录中不存在该Mod文件，进行复制
+                var srcFile = runDirMods.get(runDirModKey).file;
+                var destFile = Path.of(LAUNCHER_WORK_DIR, "mods", srcFile.getName()).toFile();
+                try {
+                    Utils.copyFile(srcFile, destFile);
+                    log.debug("Copied mod file: {} -> {}", srcFile.getAbsolutePath(), destFile.getAbsolutePath());
+                    workDirMods.put(runDirModKey, ModFile.getIt(destFile));
+                } catch (Exception e) {
+                    log.error("Failed to copy mod file: {}", srcFile.getName(), e);
+                }
             }
         }
 
         // 更新运行目录的Mod文件列表
-        workDirModSet.removeAll(modsToRemove);
-        workDirModSet.addAll(modsToAdd);
+        return workDirMods.values().stream().map(mod -> mod.file.getAbsolutePath()).collect(Collectors.toList());
+    }
 
-        return workDirModSet.stream()
-                            .map(mod -> mod.file.getAbsolutePath())
-                            .collect(Collectors.toList());
+    private static Map<String, ModFile> createMd5Map(List<File> runDirMods) {
+        return runDirMods.stream().map(ModFile::getIt).filter(Objects::nonNull).collect(Collectors.toMap(
+          modFile -> modFile.md5, modFile -> modFile, (existing, replacement) -> {
+              throw new IllegalStateException("Duplicate MD5 found: " + existing.md5 + " for files " + existing.file.getAbsolutePath() + " and " + replacement.file.getAbsolutePath());
+          }
+        ));
     }
 
     private record ModFile(
@@ -87,10 +84,9 @@ public class ModManage {
       String md5
     ) {
         public static ModFile getIt(File file) {
-            try {
-                var fileStream = new FileInputStream(file);
+            try (var fileStream = new FileInputStream(file)) {
                 return new ModFile(file, Utils.calculateMD5(fileStream));
-            } catch (FileNotFoundException ignored) {
+            } catch (IOException ignore) {
                 // 理论上不会发生（因为是从已存在的文件列表中获取的）
                 // 不存在的文件直接忽略
                 return null;

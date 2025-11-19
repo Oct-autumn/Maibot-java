@@ -8,7 +8,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import org.maibot.core.config.MainConfig;
-import org.maibot.core.util.TaskExecutorServiceImpl;
+import org.maibot.core.util.TaskExecuteServiceImpl;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -26,8 +26,8 @@ import java.util.concurrent.CompletionException;
 public class InnerServer implements DestroyableComponent {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(InnerServer.class);
 
-    private final ServerBootstrap         bootstrap;
-    private final TaskExecutorServiceImpl taskExecutorService;
+    private final ServerBootstrap        bootstrap;
+    private final TaskExecuteServiceImpl taskExecutorService;
 
     private final MainConfig.Network conf;
 
@@ -37,30 +37,30 @@ public class InnerServer implements DestroyableComponent {
     @AutoInject
     public InnerServer(
       @Value("${network}") MainConfig.Network conf,
-      TaskExecutorServiceImpl taskExecutorService,
+      TaskExecuteServiceImpl taskExecutorService,
       DispatchHandler dispatchHandler,
       ExceptionHandler exceptionHandler
     ) {
         this.bootstrap = new ServerBootstrap();
         bootstrap.channel(NioServerSocketChannel.class)
-                 .childHandler(
-                   new ChannelInitializer<SocketChannel>() {
-                       @Override
-                       protected void initChannel(SocketChannel ch) {
-                           ChannelPipeline pipeline = ch.pipeline();
+          .childHandler(
+            new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) {
+                    ChannelPipeline pipeline = ch.pipeline();
 
-                           MDC.put("connId", Integer.toHexString(System.identityHashCode(ch)));
+                    MDC.put("connId", Integer.toHexString(System.identityHashCode(ch)));
 
-                           // HTTP编解码器 与 HTTP消息聚合器（最大消息长度为5MB）
-                           pipeline.addLast("httpCodec", new HttpServerCodec());
-                           pipeline.addLast("httpAggregator", new HttpObjectAggregator(1024 * 1024 * 5));
-                           // 分发器
-                           pipeline.addLast("dispatcher", dispatchHandler);
-                           // 异常处理兜底
-                           pipeline.addLast("exceptionHandler", exceptionHandler);
-                       }
-                   }
-                 );
+                    // HTTP编解码器 与 HTTP消息聚合器（最大消息长度为5MB）
+                    pipeline.addLast("httpCodec", new HttpServerCodec());
+                    pipeline.addLast("httpAggregator", new HttpObjectAggregator(1024 * 1024 * 5));
+                    // 分发器
+                    pipeline.addLast("dispatcher", dispatchHandler);
+                    // 异常处理兜底
+                    pipeline.addLast("exceptionHandler", exceptionHandler);
+                }
+            }
+          );
 
         this.taskExecutorService = taskExecutorService;
         this.conf = conf;

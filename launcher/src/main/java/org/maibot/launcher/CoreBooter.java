@@ -19,6 +19,7 @@ public class CoreBooter {
         var coreLaunchArgs = createCoreLaunchArgs(modList);
 
         log.info("引导 Maibot Core 启动...");
+        log.debug("启动参数: {}", coreLaunchArgs);
         System.out.print("\n".repeat(2));
 
         try {
@@ -27,7 +28,7 @@ public class CoreBooter {
             var mainMethod = mainClass.getMethod("main", String[].class);
             try {
                 // 调用 Maibot Core 的主方法
-                mainMethod.invoke(null, (Object) coreLaunchArgs);
+                mainMethod.invoke(null, (Object) new String[]{coreLaunchArgs});
             } catch (InvocationTargetException e) {
                 // Maibot Core 的主方法抛出的错误
                 log.error("Maibot Core 运行时发生错误", e);
@@ -40,12 +41,12 @@ public class CoreBooter {
         }
     }
 
-    public static String[] createCoreLaunchArgs(List<String> modList) {
+    public static String createCoreLaunchArgs(List<String> modList) {
         var gson = new Gson();
         var rootNode = new JsonObject();
 
         rootNode.add("mod_list", gson.toJsonTree(modList));
 
-        return new String[]{gson.toJson(rootNode)};
+        return gson.toJson(rootNode);
     }
 }

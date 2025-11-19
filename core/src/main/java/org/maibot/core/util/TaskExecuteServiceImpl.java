@@ -3,7 +3,7 @@ package org.maibot.core.util;
 import lombok.Getter;
 import lombok.NonNull;
 import org.maibot.core.modloader.ModManager;
-import org.maibot.sdk.TaskExecutorService;
+import org.maibot.sdk.TaskExecuteService;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -20,10 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 提供线程池和虚拟线程池用于任务执行
  */
 @Component
-public final class TaskExecutorServiceImpl extends TaskExecutorService {
-    private static final Logger log = LoggerFactory.getLogger(TaskExecutorServiceImpl.class);
+public final class TaskExecuteServiceImpl extends TaskExecuteService {
+    private static final Logger log = LoggerFactory.getLogger(TaskExecuteServiceImpl.class);
 
-    private volatile boolean            isStarted      = false;
     private volatile boolean            isShuttingDown = false;
     private volatile boolean            isClosed       = false;
     @Getter
@@ -32,7 +30,7 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
     private final    ExecutorService    virtualExecutor;
 
     @AutoInject
-    public TaskExecutorServiceImpl(ModManager modManager) {
+    public TaskExecuteServiceImpl(ModManager modManager) {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             log.error("An uncaught exception occurred in thread {}", t.getName(), e);
             System.exit(1);
@@ -80,10 +78,6 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
         );
     }
 
-    public void start() {
-        this.isStarted = true;
-    }
-
     /**
      * 提交任务到执行器
      *
@@ -93,14 +87,14 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
      */
     @Override
     public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT) {
-        var future = new CompletableFuture<T>();
+        var future = new CustomCompletableFuture<T>();
 
         if (isShuttingDown) {
             future.completeExceptionally(
               new RejectedExecutionException("任务执行器正在关闭，无法接受新任务")
             );
             return future;
-        } else if (!isStarted || isClosed) {
+        } else if (isClosed) {
             future.completeExceptionally(
               new RejectedExecutionException("任务执行器未启动，无法接受任务")
             );
@@ -141,14 +135,14 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
      */
     @Override
     public CompletableFuture<Object> submit(Runnable task, boolean virT) {
-        var future = new CompletableFuture<>();
+        var future = new CustomCompletableFuture<>();
 
         if (isShuttingDown) {
             future.completeExceptionally(
               new RejectedExecutionException("任务执行器正在关闭，无法接受新任务")
             );
             return future;
-        } else if (!isStarted || isClosed) {
+        } else if (isClosed) {
             future.completeExceptionally(
               new RejectedExecutionException("任务执行器未启动，无法接受任务")
             );
@@ -180,7 +174,6 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
         return future;
     }
 
-
     /**
      * 关闭所有执行器
      */
@@ -193,6 +186,14 @@ public final class TaskExecutorServiceImpl extends TaskExecutorService {
             this.isClosed = true;
         } catch (Exception e) {
             log.error("关闭任务执行器时发生错误", e);
+        }
+    }
+
+    public class CustomCompletableFuture<T> extends CompletableFuture<T> {
+        // 覆写 defaultExecutor 方法，指定默认的执行器为 TaskExecuteServiceImpl 的 executor
+        @Override
+        public Executor defaultExecutor() {
+            return executor;
         }
     }
 }

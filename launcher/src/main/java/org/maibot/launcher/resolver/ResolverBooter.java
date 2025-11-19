@@ -117,13 +117,13 @@ public class ResolverBooter {
         );
 
         return system.createSessionBuilder()
-                     .withLocalRepositories(new LocalRepository(localRepoPath))
-                     .setSystemProperties(System.getProperties())
-                     .setDependencyGraphTransformer(depGraphTransformer)
-                     .setCache(new DefaultRepositoryCache())
-                     .setDependencySelector(new RequiredCompileDependencySelector())
-                     .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.STRICT))
-                     .build();
+          .withLocalRepositories(new LocalRepository(localRepoPath))
+          .setSystemProperties(System.getProperties())
+          .setDependencyGraphTransformer(depGraphTransformer)
+          .setCache(new DefaultRepositoryCache())
+          .setDependencySelector(new RequiredCompileDependencySelector())
+          .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.STRICT))
+          .build();
     }
 
     public static List<RemoteRepository> newRemoteRepositories() {
@@ -160,7 +160,18 @@ public class ResolverBooter {
           RepositoryPolicy.CHECKSUM_POLICY_FAIL
         )).build();
 
-        return List.of(mavenCentral, tencentMirror);
+        var localRepo = new RemoteRepository.Builder(
+          "local-repo",
+          "default",
+          "file://" + System.getProperty("user.home") + "/.m2/repository"
+        ).setPolicy(new RepositoryPolicy(
+          true,
+          RepositoryPolicy.UPDATE_POLICY_ALWAYS,
+          RepositoryPolicy.UPDATE_POLICY_ALWAYS,
+          RepositoryPolicy.CHECKSUM_POLICY_WARN
+        )).build();
+
+        return List.of(mavenCentral, tencentMirror, localRepo);
     }
 
     public static class Utils {

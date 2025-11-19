@@ -28,9 +28,8 @@ import org.maibot.core.net.client.HttpClientProviderImpl;
 import org.maibot.core.thinking.ThinkingFlowManager;
 import org.maibot.core.util.AnsiFormatter;
 import org.maibot.core.util.EasterEgg;
-import org.maibot.core.util.TaskExecutorServiceImpl;
+import org.maibot.core.util.TaskExecuteServiceImpl;
 import org.maibot.core.util.TimerProxy;
-import org.maibot.sdk.TaskExecutorService;
 import org.maibot.sdk.config.ConfigService;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.IgnorableException;
@@ -50,16 +49,16 @@ public class MaibotMain {
     private static final Logger log = LoggerFactory.getLogger(MaibotMain.class);
 
     /* 单例资源区 */
-    private final TaskExecutorServiceImpl taskExecutorService;
-    private final InnerServer             innerServer;
-    private final HttpClientProviderImpl  httpClientProvider;
-    private final TerminalController      terminalController;
-    private final ThinkingFlowManager     thinkingFlowManager;
-    private final ModManager              modManager;
+    private final TaskExecuteServiceImpl taskExecutorService;
+    private final InnerServer            innerServer;
+    private final HttpClientProviderImpl httpClientProvider;
+    private final TerminalController     terminalController;
+    private final ThinkingFlowManager    thinkingFlowManager;
+    private final ModManager             modManager;
 
     @AutoInject
     public MaibotMain(
-      TaskExecutorServiceImpl taskExecutorService,
+      TaskExecuteServiceImpl taskExecutorService,
       InnerServer innerServer,
       HttpClientProviderImpl httpClientProvider,
       TerminalController terminalController,
@@ -128,10 +127,22 @@ public class MaibotMain {
             Instance.close();
             log.info("MaiBot 已成功关闭");
             // 彩蛋
-            System.out.println(AnsiFormatter.render("\n> @{FG#FFB6C1 See you tomorrow}@\n"));
+            System.out.println(AnsiFormatter.render(
+              "\n>> @{FG#FFB6C1 ··· · · -·-- --- ··- - --- -- --- ·-· ·-· --- ·--}@ <<\n"));
         });
         shutdownThread.setName("Shutdown-Hook");
         Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+        // Mod加载需要放在所有组件启动之前
+        // 因为组件可能依赖Mod提供的功能
+        // Mod加载完成后才能保证组件的正常工作
+        TimerProxy.start(
+          () -> {
+              log.info("正在加载Mod...");
+              ModManager modManager = Instance.get(ModManager.class);
+              modManager.loadMods(LAUNCH_ARGS.get().modList());
+          }, "加载Mod用时：{}ms"
+        );
 
         MaibotMain maibotMain = TimerProxy.start(() -> Instance.get(MaibotMain.class), "实例化主类用时：{}ms");
 
@@ -150,22 +161,10 @@ public class MaibotMain {
     }
 
     public void run() {
-        // Mod加载需要放在所有组件启动之前
-        // 因为组件可能依赖Mod提供的功能
-        // Mod加载完成后才能保证组件的正常工作
-        TimerProxy.start(
-          () -> {
-              log.info("正在加载Mod...");
-              this.modManager.loadMods(LAUNCH_ARGS.get().modList());
-          }, "加载Mod用时：{}ms"
-        );
+        // <!-- 从此处开始可以正常使用来自IoC的线程池 -->
 
         var terminalFuture = TimerProxy.start(
           () -> {
-              log.info("正在启动任务执行器...");
-              taskExecutorService.start();
-              // <!-- 从此处开始可以正常使用来自IoC的线程池 -->
-
               log.info("正在启动思维流...");
               this.thinkingFlowManager.initialize();
 
@@ -179,7 +178,8 @@ public class MaibotMain {
           }, "启动用时：{}ms"
         );
 
-        // TODO: 启动Mod
+        // 启动Mod
+        this.modManager.enableMods();
 
         // 阻塞调用，直到终端退出
         terminalFuture.join();

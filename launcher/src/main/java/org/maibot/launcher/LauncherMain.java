@@ -60,11 +60,11 @@ public class LauncherMain {
         var parser = ArgumentParsers.newFor("Maibot-JE Launcher").build().defaultHelp(true).description(
           "Launcher for Maibot-JavaEdition");
         parser.addArgument("--log-level")
-              // 设置日志级别
-              .help("Set the log level for the launcher (TRACE, DEBUG, INFO, WARN, ERROR, OFF)").setDefault("INFO");
+          // 设置日志级别
+          .help("Set the log level for the launcher (TRACE, DEBUG, INFO, WARN, ERROR, OFF)").setDefault("INFO");
         parser.addArgument("--to-core")
-              // 传递给 Maibot Core 的参数
-              .help("Arguments to pass to Maibot Core").nargs("*").setDefault();
+          // 传递给 Maibot Core 的参数
+          .help("Arguments to pass to Maibot Core").nargs("*").setDefault();
 
         var ns = parser.parseArgsOrFail(args);
 
@@ -112,8 +112,6 @@ public class LauncherMain {
               coreJar
             );
         }
-
-        System.gc();    // 主动GC，释放内存
 
         // 创建URL类加载器并启动 Maibot Core
         try (var urlClassLoader = new URLClassLoader(dependencyUrls, ClassLoader.getSystemClassLoader())) {
@@ -278,11 +276,11 @@ public class LauncherMain {
             }
 
             var collectRequest = new CollectRequest().setDependencies(childrenDepsCoords.stream()
-                                                                                        .map(coords -> new Dependency(
-                                                                                          new DefaultArtifact(coords),
-                                                                                          "compile"
-                                                                                        ))
-                                                                                        .toList()).setRepositories(
+                                                                        .map(coords -> new Dependency(
+                                                                          new DefaultArtifact(coords),
+                                                                          "compile"
+                                                                        ))
+                                                                        .toList()).setRepositories(
               ResolverBooter.newRemoteRepositories());
 
             CollectResult collectResult;

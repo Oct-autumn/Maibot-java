@@ -1,4 +1,4 @@
-package org.maibot.sdk.db;
+package org.maibot.sdk.storage.db;
 
 import jakarta.persistence.EntityManager;
 import org.maibot.sdk.exceptions.DbOperationException;

@@ -1,6 +1,6 @@
 package org.maibot.sdk;
 
-import lombok.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @author OctAutumn
  */
-public class SeqGenerator {
+public class SNoGenerator {
     /// 上一个序列号的时间戳部分
     private static final AtomicLong    lastTimestamp = new AtomicLong(Instant.now().getEpochSecond());
     /// 当前自增计数器（同一时间戳内递增）
@@ -29,14 +29,14 @@ public class SeqGenerator {
      *
      * @return 下一个序列号
      */
-    public static Sequence nextSeq() {
+    public static SerialNo nextSeq() {
         // 获取当前时间戳（秒）
         // 比较，若与上次发放的是同一时间戳，则自增计数器加一；
         // - 若发生时间流逝，则重置自增计数器为0，并更新时间戳；
         // - 若发生时钟回拨，则阻塞直到时间超过为止，然后继续发放序列号
         // - 若自增计数器溢出，则阻塞直到时间流逝为止，然后重置自增计数器为0
         // 返回由时间戳和自增计数组成的序列号
-        AtomicReference<Sequence> seq = new AtomicReference<>();
+        AtomicReference<SerialNo> seq = new AtomicReference<>();
         lastTimestamp.updateAndGet(prev -> {
             AtomicLong now = new AtomicLong(Instant.now().getEpochSecond());
             if (now.get() < prev) {
@@ -70,12 +70,12 @@ public class SeqGenerator {
                     }
                     return curr + 1;
                 });
-                seq.set(new Sequence(now.get(), (short) counter));
+                seq.set(new SerialNo(now.get(), (short) counter));
                 return prev;
             } else {
                 // 时间流逝，重置自增计数器
                 currentSeq.set(0);
-                seq.set(new Sequence(now.get(), (short) 0));
+                seq.set(new SerialNo(now.get(), (short) 0));
                 return now.get();
             }
         });
@@ -83,37 +83,45 @@ public class SeqGenerator {
         return seq.get();
     }
 
+    public static SerialNo from(long sNo) {
+        return new SerialNo(sNo);
+    }
+
     /**
      * 全局序列号，包含时间戳部分和自增部分
      * <p>
      * 前48位为时间戳部分（秒），后16位为自增部分（同一秒内递增）
      *
-     * @param seqNumber 完整序列号
+     * @param sNo 完整序列号
      */
-    public record Sequence(
-      long seqNumber
-    ) implements Comparable<Sequence> {
-        public Sequence(long timestamp, short counter) {
+    public record SerialNo(
+      long sNo
+    ) implements Comparable<SerialNo> {
+        public SerialNo(long timestamp, short counter) {
             this((timestamp << 16) | (counter & 0xFFFF));
         }
 
         @Override
-        public int compareTo(Sequence o) {
-            return Long.compare(this.seqNumber, o.seqNumber);
+        public int compareTo(SerialNo o) {
+            return Long.compare(this.sNo, o.sNo);
         }
 
         @Override
-        @NonNull
+        @NotNull
         public String toString() {
-            return String.format("Sequence[time=%d, counter=%d]", timestamp(), counter());
+            return String.format("Sequence[sNo=%s]", this.toHexString());
+        }
+
+        public String toHexString() {
+            return String.format("%016X", sNo);
         }
 
         public long timestamp() {
-            return seqNumber >>> 16;
+            return sNo >>> 16;
         }
 
         public short counter() {
-            return (short) (seqNumber & 0xFFFF);
+            return (short) (sNo & 0xFFFF);
         }
     }
 }

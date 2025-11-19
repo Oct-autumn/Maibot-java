@@ -18,6 +18,20 @@ repositories {
     mavenCentral()
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+
+    // Exclude src/main/java/org/maibot/core/cache/mcache from compiling
+    sourceSets {
+        main {
+            java {
+                exclude("org/maibot/core/cache/mcache/**")
+            }
+        }
+    }
+}
+
 dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -45,6 +59,14 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-core:7.1.3.Final")
     implementation("org.hibernate.orm:hibernate-c3p0:7.1.3.Final")
     implementation("org.hibernate.orm:hibernate-community-dialects:7.1.3.Final")
+
+    // javax xml bind (for Ehcache xml configuration)
+    implementation("javax.xml.bind:jaxb-api:2.3.1")
+    implementation("org.glassfish.jaxb:jaxb-runtime:2.3.9")
+
+    // EhCache for caching
+    implementation("org.ehcache:ehcache:3.11.1")
+    implementation("org.hibernate.orm:hibernate-jcache:7.1.7.Final")
 
     // Semver4j for semantic versioning
     implementation("org.semver4j:semver4j:6.0.0")
@@ -122,12 +144,9 @@ tasks.named("processResources") {
 }
 
 tasks.jar {
-    dependsOn(":sdk:jar")
     manifest {
         attributes["Main-Class"] = "org.maibot.core.Main"
     }
-    // TODO: Publish SDK as Maven Package
-    from(project(":sdk").tasks.named("jar").get().outputs.files.map { zipTree(it) })
 }
 
 // Calculate source code hash for build identification

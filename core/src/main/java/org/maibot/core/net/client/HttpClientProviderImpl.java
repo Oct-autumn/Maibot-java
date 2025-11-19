@@ -10,7 +10,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import org.maibot.core.net.ExceptionHandler;
-import org.maibot.core.util.TaskExecutorServiceImpl;
+import org.maibot.core.util.TaskExecuteServiceImpl;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.ioc.DestroyableComponent;
@@ -30,7 +30,7 @@ public class HttpClientProviderImpl implements DestroyableComponent, HttpClientP
     private final EventLoopGroup eventLoopGroup;
 
     @AutoInject
-    HttpClientProviderImpl(TaskExecutorServiceImpl taskExecutorService, ExceptionHandler exceptionHandler) {
+    HttpClientProviderImpl(TaskExecuteServiceImpl taskExecutorService, ExceptionHandler exceptionHandler) {
         this.eventLoopGroup = new SingleThreadIoEventLoop(
           null,
           taskExecutorService.getExecutor(),

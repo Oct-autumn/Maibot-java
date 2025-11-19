@@ -3,19 +3,27 @@ import java.time.Instant
 
 plugins {
     id("java")
+    id("maven-publish")
 }
 
-group = "org.maibot.sdk"
+group = "org.maibot"
 description = "MaiBot SDK"
 
 // SDK Version
 // Update this version when releasing a new SDK version
 // Format: MAJOR.MINOR.PATCH-PRERELEASE
 // Do not add build metadata here; it will be appended automatically during the build process
-version = "0.1.0-Alpha"
+version = "0.1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+
+    withSourcesJar()
 }
 
 dependencies {
@@ -35,9 +43,11 @@ dependencies {
     // Hibernate for ORM
     implementation("org.hibernate.orm:hibernate-core:7.1.3.Final")
 
-    // Lombok for reducing boilerplate code
-    compileOnly("org.projectlombok:lombok:1.18.42")
-    annotationProcessor("org.projectlombok:lombok:1.18.42")
+    // JCache for caching
+    implementation("javax.cache:cache-api:1.1.1")
+
+    // Jetbrains Annotations
+    implementation("org.jetbrains:annotations:24.0.1")
 }
 
 // Create build-inf.properties
@@ -57,6 +67,25 @@ tasks.register("createBuildInf") {
             buildTime=${Instant.now().epochSecond}
         """.trimIndent()
         )
+    }
+}
+
+publishing {
+    // Publish sdk Jar to local Maven repository
+    publications {
+        create<MavenPublication>("sdk") {
+            groupId = project.group as String?
+            artifactId = project.name
+            version = project.version as String?
+
+            artifact(tasks.named("jar"))
+            artifact(tasks.named("sourcesJar")) {
+                classifier = "sources"
+            }
+        }
+    }
+    repositories {
+        mavenLocal()
     }
 }
 

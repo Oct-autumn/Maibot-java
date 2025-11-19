@@ -2,11 +2,11 @@ package org.maibot.core.thinking;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import org.maibot.core.ioc.Instance;
-import org.maibot.core.persistence.db.DatabaseServiceImpl;
-import org.maibot.core.util.TaskExecutorServiceImpl;
-import org.maibot.sdk.db.dao.InteractionEntity;
-import org.maibot.sdk.db.dao.InteractionGroup;
-import org.maibot.sdk.db.dao.InteractionStream;
+import org.maibot.core.persistence.DatabaseServiceImpl;
+import org.maibot.core.util.TaskExecuteServiceImpl;
+import org.maibot.sdk.storage.db.dao.InteractionEntity;
+import org.maibot.sdk.storage.db.dao.InteractionGroup;
+import org.maibot.sdk.storage.db.dao.InteractionStream;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
@@ -37,15 +37,15 @@ public class ThinkingFlowManager implements DestroyableComponent {
     private static final Logger log = LoggerFactory.getLogger(ThinkingFlowManager.class);
 
     /* 单例资源区 */
-    private final DatabaseServiceImpl     databaseService;
-    private final TaskExecutorServiceImpl taskExecutorService;
+    private final DatabaseServiceImpl    databaseService;
+    private final TaskExecuteServiceImpl taskExecutorService;
 
     /* 运行资源区 */
     /// 当前所有交互流
     private final Map<String, ThinkingFlow> thinkingFlows = new ConcurrentHashMap<>();
 
     @AutoInject
-    private ThinkingFlowManager(DatabaseServiceImpl databaseService, TaskExecutorServiceImpl taskExecutorService) {
+    private ThinkingFlowManager(DatabaseServiceImpl databaseService, TaskExecuteServiceImpl taskExecutorService) {
         this.databaseService = databaseService;
         this.taskExecutorService = taskExecutorService;
     }
@@ -74,8 +74,8 @@ public class ThinkingFlowManager implements DestroyableComponent {
                 for (var stream : streams) {
                     String streamId = stream.getId();
                     var flow = Instance.get(ThinkingFlowFactory.class)
-                                       .setFlowId(streamId)
-                                       .build();
+                      .setFlowId(streamId)
+                      .build();
                     thinkingFlows.put(streamId, flow);
                 }
 
@@ -160,8 +160,8 @@ public class ThinkingFlowManager implements DestroyableComponent {
               });
 
               return Instance.get(ThinkingFlowFactory.class)
-                             .setFlowId(streamId)
-                             .build();
+                .setFlowId(streamId)
+                .build();
           }
         );
     }

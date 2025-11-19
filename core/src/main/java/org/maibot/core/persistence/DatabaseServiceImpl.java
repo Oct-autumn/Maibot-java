@@ -1,4 +1,4 @@
-package org.maibot.core.persistence.db;
+package org.maibot.core.persistence;
 
 import io.github.classgraph.ClassGraph;
 import jakarta.persistence.Entity;
@@ -6,10 +6,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
 import org.hibernate.jpa.HibernatePersistenceProvider;
+import org.maibot.core.cache.GlobalCacheManagerImpl;
 import org.maibot.core.config.MainConfig;
-import org.maibot.core.util.TaskExecutorServiceImpl;
-import org.maibot.sdk.db.DatabaseService;
-import org.maibot.sdk.db.dao.DatabaseVersion;
+import org.maibot.core.util.TaskExecuteServiceImpl;
+import org.maibot.sdk.storage.db.DatabaseService;
+import org.maibot.sdk.storage.db.dao.DatabaseVersion;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.NotInitialized;
@@ -34,17 +35,18 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
     private static final Logger log         = LoggerFactory.getLogger(DatabaseServiceImpl.class);
     private static final Semver SUPPORT_VER = new Semver("0.1.0");
 
-    private final TaskExecutorServiceImpl taskExecutorService;
+    private final TaskExecuteServiceImpl taskExecutorService;
 
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
     DatabaseServiceImpl(
       @Value("${local_data.database}") MainConfig.LocalData.Database conf,
-      TaskExecutorServiceImpl taskExecutorService
+      TaskExecuteServiceImpl taskExecutorService,
+      GlobalCacheManagerImpl globalCacheManager
     ) {
         this.taskExecutorService = taskExecutorService;
-        this.init(conf);
+        this.init(conf, globalCacheManager);
     }
 
     /**
@@ -52,7 +54,7 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
      *
      * @param conf 数据库配置
      */
-    public void init(MainConfig.LocalData.Database conf) {
+    public void init(MainConfig.LocalData.Database conf, GlobalCacheManagerImpl globalCacheManager) {
         // 检查sqlitePath文件是否存在，不存在则创建
 
         var dbFile = new File(conf.sqlitePath());
@@ -71,15 +73,15 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
         }
 
         // 获取配置
-        var cfg = getDbConfiguration(conf);
+        var cfg = getDbConfiguration(conf, globalCacheManager);
 
         // 注册实体类
         Set<Class<?>> entityClasses = new HashSet<>();
         var classLoader = Thread.currentThread().getContextClassLoader();
         try (var findResult = new ClassGraph().overrideClassLoaders(classLoader)
-                                              .acceptPackages("org.maibot")
-                                              .enableAllInfo()
-                                              .scan()) {
+          .acceptPackages("org.maibot")
+          .enableAllInfo()
+          .scan()) {
             var entityClassInfo = findResult.getClassesWithAnnotation(Entity.class);
             for (var classInfo : entityClassInfo) {
                 var clazz = Class.forName(classInfo.getName(), false, classLoader);
@@ -109,7 +111,10 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
         }
     }
 
-    private static PersistenceConfiguration getDbConfiguration(MainConfig.LocalData.Database conf) {
+    private static PersistenceConfiguration getDbConfiguration(
+      MainConfig.LocalData.Database conf,
+      GlobalCacheManagerImpl globalCacheManager
+    ) {
         var cfg = new PersistenceConfiguration("maibot-pu");
         // SQLite 配置
         // TODO: 对其他数据库的支持
@@ -120,6 +125,10 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
         cfg.property("hibernate.c3p0.min_size", 1);
         cfg.property("hibernate.c3p0.max_size", 1);
         cfg.property("hibernate.c3p0.timeout", 0);
+
+        cfg.property("hibernate.cache.use_second_level_cache", "true");
+        cfg.property("hibernate.cache.region.factory_class", "org.hibernate.cache.jcache.JCacheRegionFactory");
+        cfg.property("hibernate.javax.cache.cache_manager", globalCacheManager.cacheManager());
 
         // 开发时开启 SQL 日志
         cfg.property("hibernate.show_sql", "true");

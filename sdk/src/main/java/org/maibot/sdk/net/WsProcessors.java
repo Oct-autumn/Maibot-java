@@ -3,16 +3,14 @@ package org.maibot.sdk.net;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import lombok.Getter;
 import org.maibot.sdk.exceptions.FatalError;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class WsProcessors extends ChannelInboundHandlerAdapter {
-    @Getter
-    private final String         path;
-    @Getter
+    private final String path;
+
     private final List<Class<?>> handlers;
 
     /**
@@ -39,5 +37,13 @@ public class WsProcessors extends ChannelInboundHandlerAdapter {
         }
 
         this.handlers = finalHandlers;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public List<Class<?>> getHandlers() {
+        return handlers;
     }
 }

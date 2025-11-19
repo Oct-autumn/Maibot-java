@@ -1,16 +1,12 @@
-package org.maibot.sdk.db.dao;
+package org.maibot.sdk.storage.db.dao;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.util.List;
 
 @Entity
-@Getter
-@Setter
 @Table(name = "person")
 public class Person {
     @Id
@@ -27,4 +23,32 @@ public class Person {
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
     private String updatedAt;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public List<InteractionEntity> getInteractionEntities() {
+        return interactionEntities;
+    }
+
+    public String getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(String createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(String updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

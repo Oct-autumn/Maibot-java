@@ -1,6 +1,5 @@
 package org.maibot.core.util;
 
-import lombok.Getter;
 import lombok.NonNull;
 import org.maibot.core.modloader.ModManager;
 import org.maibot.sdk.TaskExecuteService;
@@ -22,12 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class TaskExecuteServiceImpl extends TaskExecuteService {
     private static final Logger log = LoggerFactory.getLogger(TaskExecuteServiceImpl.class);
 
-    private volatile boolean            isShuttingDown = false;
-    private volatile boolean            isClosed       = false;
-    @Getter
-    private final    ThreadPoolExecutor executor;
-    @Getter
-    private final    ExecutorService    virtualExecutor;
+    private volatile boolean isShuttingDown = false;
+    private volatile boolean isClosed       = false;
+
+    private final ThreadPoolExecutor executor;
+
+    private final ExecutorService virtualExecutor;
 
     @AutoInject
     public TaskExecuteServiceImpl(ModManager modManager) {
@@ -36,6 +35,7 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
             System.exit(1);
         });
         var processorCount = Runtime.getRuntime().availableProcessors();
+
         this.executor = new ThreadPoolExecutor(
           processorCount,
           processorCount * 2,
@@ -55,6 +55,7 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
               }
           }
         );
+
         this.virtualExecutor = Executors.newThreadPerTaskExecutor(
           new ThreadFactory() {
               final AtomicInteger threadNumber = new AtomicInteger(1);
@@ -78,6 +79,16 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
         );
     }
 
+    @Override
+    public ExecutorService executor() {
+        return executor;
+    }
+
+    @Override
+    public ExecutorService virtualExecutor() {
+        return virtualExecutor;
+    }
+
     /**
      * 提交任务到执行器
      *
@@ -87,7 +98,7 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
      */
     @Override
     public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT) {
-        var future = new CustomCompletableFuture<T>();
+        var future = new CompletableFuture<T>();
 
         if (isShuttingDown) {
             future.completeExceptionally(
@@ -135,7 +146,7 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
      */
     @Override
     public CompletableFuture<Object> submit(Runnable task, boolean virT) {
-        var future = new CustomCompletableFuture<>();
+        var future = new CompletableFuture<>();
 
         if (isShuttingDown) {
             future.completeExceptionally(
@@ -174,6 +185,11 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
         return future;
     }
 
+    @Override
+    public <T> CompletableFuture<T> newCompletableFuture(boolean virT) {
+        return null;
+    }
+
     /**
      * 关闭所有执行器
      */
@@ -186,14 +202,6 @@ public final class TaskExecuteServiceImpl extends TaskExecuteService {
             this.isClosed = true;
         } catch (Exception e) {
             log.error("关闭任务执行器时发生错误", e);
-        }
-    }
-
-    public class CustomCompletableFuture<T> extends CompletableFuture<T> {
-        // 覆写 defaultExecutor 方法，指定默认的执行器为 TaskExecuteServiceImpl 的 executor
-        @Override
-        public Executor defaultExecutor() {
-            return executor;
         }
     }
 }

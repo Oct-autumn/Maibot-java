@@ -33,7 +33,7 @@ public class HttpClientProviderImpl implements DestroyableComponent, HttpClientP
     HttpClientProviderImpl(TaskExecuteServiceImpl taskExecutorService, ExceptionHandler exceptionHandler) {
         this.eventLoopGroup = new SingleThreadIoEventLoop(
           null,
-          taskExecutorService.getExecutor(),
+          taskExecutorService.executor(),
           tae -> NioIoHandler.newFactory().newHandler(tae)
         );
 

@@ -3,10 +3,7 @@ package org.maibot.sdk;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 线程安全的全局序列号生成器（可用于时间排序）
@@ -16,13 +13,16 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author OctAutumn
  */
 public class SNoGenerator {
-    /// 上一个序列号的时间戳部分
-    private static final AtomicLong    lastTimestamp = new AtomicLong(Instant.now().getEpochSecond());
-    /// 当前自增计数器（同一时间戳内递增）
+    /// 计数器状态，前48位为时间戳（毫秒），后16位为自增计数器
     ///
     /// 由于系统重启一定会产生可观测的时间流逝，递增计数器一定会被重置。
-    /// 因此不需要持久化存储递增计数器的值
-    private static final AtomicInteger currentSeq    = new AtomicInteger(0);
+    /// 因此不需要持久化存储计数器的值
+    private static final AtomicLong STATE = new AtomicLong(initialState());
+
+    private static long initialState() {
+        long ts = System.currentTimeMillis();
+        return (ts << 16);
+    }
 
     /**
      * 获取下一个序列号
@@ -36,51 +36,52 @@ public class SNoGenerator {
         // - 若发生时钟回拨，则阻塞直到时间超过为止，然后继续发放序列号
         // - 若自增计数器溢出，则阻塞直到时间流逝为止，然后重置自增计数器为0
         // 返回由时间戳和自增计数组成的序列号
-        AtomicReference<SerialNo> seq = new AtomicReference<>();
-        lastTimestamp.updateAndGet(prev -> {
-            AtomicLong now = new AtomicLong(Instant.now().getEpochSecond());
-            if (now.get() < prev) {
-                // 时钟回拨，阻塞直到时间超过为止
-                do {
-                    try {
-                        Thread.sleep(Duration.ofMillis(100));
-                    } catch (InterruptedException ignored) {
-                        Thread.currentThread().interrupt();
-                    }
-                    now.set(Instant.now().getEpochSecond());
-                } while (now.get() <= prev);
+        while (true) {
+            long s = STATE.get();
+            long ts = s >>> 16;
+            int cnt = (int) (s & 0xFFFFL);
+            long now = System.currentTimeMillis();
+
+            if (now < ts) {
+                // 时钟回拨，短暂等待直到时间 > ts（在 CAS 之外等待）
+                try {
+                    Thread.sleep(Duration.ofMillis(10));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                continue;
             }
 
-            if (now.get() == prev) {
-                // 同一时间戳内，递增计数器
-                int counter = currentSeq.getAndUpdate(curr -> {
-                    if (curr == 0xFFFF) {
-                        // 自增计数器溢出，阻塞直到时间流逝为止
-                        long newNow;
-                        do {
-                            try {
-                                Thread.sleep(Duration.ofMillis(100));
-                            } catch (InterruptedException ignored) {
-                                Thread.currentThread().interrupt();
-                            }
-                            newNow = Instant.now().getEpochSecond();
-                        } while (newNow <= prev);
-                        now.set(newNow);
-                        return 0;
-                    }
-                    return curr + 1;
-                });
-                seq.set(new SerialNo(now.get(), (short) counter));
-                return prev;
-            } else {
-                // 时间流逝，重置自增计数器
-                currentSeq.set(0);
-                seq.set(new SerialNo(now.get(), (short) 0));
-                return now.get();
-            }
-        });
+            if (now == ts) {
+                if (cnt == 0xFFFF) {
+                    // 溢出：等待到下一毫秒后尝试把计数器重置为0
+                    do {
+                        try {
+                            Thread.sleep(Duration.ofMillis(10));
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        now = System.currentTimeMillis();
+                    } while (now <= ts);
 
-        return seq.get();
+                    long newState = (now << 16);
+                    if (STATE.compareAndSet(s, newState)) {
+                        return new SerialNo(now, (short) 0);
+                    }
+                } else {
+                    long newCnt = (cnt + 1) & 0xFFFFL;
+                    long newState = (ts << 16) | newCnt;
+                    if (STATE.compareAndSet(s, newState)) {
+                        return new SerialNo(ts, (short) newCnt);
+                    }
+                }
+            } else { // now > ts
+                long newState = (now << 16);
+                if (STATE.compareAndSet(s, newState)) {
+                    return new SerialNo(now, (short) 0);
+                }
+            }
+        }
     }
 
     public static SerialNo from(long sNo) {

@@ -49,15 +49,15 @@ final class ImplManager {
             if (anno == null) {
                 // 说明@Component作为元注解使用，获取实际注解
                 anno = Arrays.stream(clazz.getAnnotations())
-                             .map(a -> a.annotationType().getAnnotation(Component.class))
-                             .filter(Objects::nonNull)
-                             .findFirst()
-                             .orElseThrow(
-                               // 理论上不会发生，因为前面已经通过ClassGraph筛选过了
-                               () -> new FatalError(
-                                 "Component annotation not found on class %s during registration. This shouldn't happen.",
-                                 clazz.getName()
-                               ));
+                  .map(a -> a.annotationType().getAnnotation(Component.class))
+                  .filter(Objects::nonNull)
+                  .findFirst()
+                  .orElseThrow(
+                    // 理论上不会发生，因为前面已经通过ClassGraph筛选过了
+                    () -> new FatalError(
+                      "Component annotation not found on class %s during registration. This shouldn't happen.",
+                      clazz.getName()
+                    ));
             }
 
             String name = anno.name();
@@ -168,7 +168,7 @@ final class ImplManager {
     }
 
     private static final class ImplMap {
-        Map<String, Class<?>> impls   = new HashMap<>();
-        Class<?>              primary = null;
+        final Map<String, Class<?>> impls = new HashMap<>();
+        Class<?> primary = null;
     }
 }

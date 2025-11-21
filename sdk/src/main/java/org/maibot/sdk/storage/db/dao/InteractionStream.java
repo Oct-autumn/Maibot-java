@@ -9,10 +9,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Entity
-@Table(name = "interaction_stream", indexes = {
-  @Index(name = "idx_entity_id", columnList = "entity_id", unique = true),
-  @Index(name = "idx_group_id", columnList = "group_id", unique = true)
-})
+@Table(name = "interaction_stream", indexes = @Index(name = "idx_interaction_stream_type_entity_group", columnList = "type, entity_id, group_id", unique = true))
 public class InteractionStream {
     @Id
     private String id;
@@ -21,11 +18,11 @@ public class InteractionStream {
     private StreamType type;
 
     @ManyToOne
-    @JoinColumn(name = "entity_id", foreignKey = @ForeignKey(name = "FK_InteractionStream_InteractionEntity"))
+    @JoinColumn(name = "entity_id", referencedColumnName = "id")
     private InteractionEntity entity;
 
     @ManyToOne
-    @JoinColumn(name = "group_id", foreignKey = @ForeignKey(name = "FK_InteractionStream_Group"))
+    @JoinColumn(name = "group_id", referencedColumnName = "id")
     private InteractionGroup group;
 
     @OneToMany(mappedBy = "stream", cascade = CascadeType.ALL)

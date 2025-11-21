@@ -13,6 +13,10 @@ public class Person {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /// 名称
+    @Column(name = "name", nullable = false)
+    private String name;
+
     @OneToMany(mappedBy = "person", cascade = CascadeType.ALL)
     private List<InteractionEntity> interactionEntities;
 
@@ -30,6 +34,14 @@ public class Person {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public List<InteractionEntity> getInteractionEntities() {

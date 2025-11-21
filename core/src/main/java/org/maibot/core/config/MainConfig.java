@@ -16,7 +16,6 @@ public record MainConfig(
   @JsonProperty(value = "bot_info", required = true) BotInfo botInfo,
   @JsonProperty(value = "log", required = true) Log log,
   @JsonProperty(value = "network", required = true) Network network,
-  @JsonProperty(value = "local_data", required = true) LocalData localData,
   @JsonProperty(value = "thinking", required = true) Thinking thinking
 ) {
     public record BotInfo(
@@ -49,13 +48,6 @@ public record MainConfig(
       @JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) Integer port
     ) {
-    }
-
-    public record LocalData(@JsonProperty(value = "database", required = true) Database database) {
-        public record Database(
-          @JsonProperty(value = "sqlite_path", required = true) String sqlitePath
-        ) {
-        }
     }
 
     public record Thinking(

@@ -1,7 +1,6 @@
-package org.maibot.sdk;
+package org.maibot.sdk.util;
 
-public class Util {
-
+public class StrUtils {
     public static String strAbbreviate(String str, int maxLength, int threshold) {
         if (str.length() <= maxLength) {
             return str;

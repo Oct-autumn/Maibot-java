@@ -13,7 +13,7 @@ description = "MaiBot SDK"
 // Update this version when releasing a new SDK version
 // Format: MAJOR.MINOR.PATCH-PRERELEASE
 // Do not add build metadata here; it will be appended automatically during the build process
-version = "0.1.0-SNAPSHOT"
+version = "0.1.0-Alpha"
 
 repositories {
     mavenCentral()
@@ -86,6 +86,20 @@ publishing {
     }
     repositories {
         mavenLocal()
+    }
+}
+
+tasks.named("publishToMavenLocal") {
+    doLast {
+        // Move jar to launcher/run/.maibot-launcher/libs/org/maibot/sdk/{version}
+        val sdkVersion = project.version.toString()
+        val sourceFile = file("${layout.buildDirectory.get()}/libs/${project.name}-$sdkVersion.jar")
+        val targetDir = file("../launcher/run/.maibot-launcher/libs/org/maibot/sdk/$sdkVersion")
+        val targetFile = file("$targetDir/${project.name}-$sdkVersion.jar")
+        if (!targetDir.exists()) {
+            targetDir.mkdirs()
+        }
+        sourceFile.copyTo(targetFile, overwrite = true)
     }
 }
 

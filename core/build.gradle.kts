@@ -60,6 +60,9 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-c3p0:7.1.3.Final")
     implementation("org.hibernate.orm:hibernate-community-dialects:7.1.3.Final")
 
+    // Flyway for database migrations
+    implementation("org.flywaydb:flyway-core:11.17.1")
+
     // javax xml bind (for Ehcache xml configuration)
     implementation("javax.xml.bind:jaxb-api:2.3.1")
     implementation("org.glassfish.jaxb:jaxb-runtime:2.3.9")

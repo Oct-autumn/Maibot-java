@@ -7,7 +7,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 
 @Entity
-@Table(name = "message")
+@Table(name = "message", indexes = {
+  @Index(name = "idx_message_timestamp", columnList = "timestamp"),
+  @Index(name = "idx_message_stream", columnList = "stream_id"),
+})
 public class Message {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,8 +22,8 @@ public class Message {
     @Column(name = "sequence", nullable = false)
     private Long sequence;
 
-    @Column(name = "content", nullable = false, columnDefinition = "MEDIUMTEXT")
-    private String content;
+    @Column(name = "prompt_str", columnDefinition = "MEDIUMTEXT")
+    private String promptStr;
 
     @Column(name = "raw_content_json", nullable = false, columnDefinition = "MEDIUMTEXT")
     private String rawContentJson;
@@ -29,12 +32,12 @@ public class Message {
     private String objectType;
 
     @ManyToOne
-    @JoinColumn(name = "stream_id", nullable = false, foreignKey = @ForeignKey(name = "FK_Message_InteractionStream"))
-    private InteractionStream stream;
+    @JoinColumn(name = "sender_id", referencedColumnName = "id", nullable = false)
+    private InteractionEntity sender;
 
     @ManyToOne
-    @JoinColumn(name = "sender_entity_id", nullable = false, foreignKey = @ForeignKey(name = "FK_Message_InteractionEntity"))
-    private InteractionEntity sender;
+    @JoinColumn(name = "stream_id", referencedColumnName = "id", nullable = false, foreignKey = @ForeignKey(name = "FK_Message_InteractionStream"))
+    private InteractionStream stream;
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
@@ -68,12 +71,12 @@ public class Message {
         this.sequence = sequence;
     }
 
-    public String getContent() {
-        return content;
+    public String getPromptStr() {
+        return promptStr;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public void setPromptStr(String content) {
+        this.promptStr = content;
     }
 
     public String getRawContentJson() {

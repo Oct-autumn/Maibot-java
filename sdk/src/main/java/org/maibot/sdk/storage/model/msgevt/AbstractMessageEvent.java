@@ -3,10 +3,16 @@ package org.maibot.sdk.storage.model.msgevt;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.EntityManager;
 import org.maibot.sdk.SNoGenerator;
-import org.maibot.sdk.storage.db.dao.InteractionEntity;
+import org.maibot.sdk.manager.InteractionEntityManager;
+import org.maibot.sdk.manager.InteractionGroupManager;
+import org.maibot.sdk.manager.InteractionStreamManager;
 import org.maibot.sdk.storage.db.dao.InteractionStream;
 import org.maibot.sdk.storage.db.dao.Message;
+import org.maibot.sdk.storage.domain.StreamType;
+import org.maibot.sdk.util.UnwrapUtils;
 import tools.jackson.databind.ObjectMapper;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * 抽象消息事件接口，定义了将消息转化为提示词字符串和数据库存储对象的方法
@@ -87,7 +93,12 @@ public abstract class AbstractMessageEvent {
      * @param em 实体管理器
      * @return 数据库消息对象
      */
-    public Message toDatabaseObject(EntityManager em) {
+    public Message toDatabaseObject(
+      EntityManager em,
+      InteractionEntityManager interactionEntityManager,
+      InteractionGroupManager interactionGroupManager,
+      InteractionStreamManager interactionStreamManager
+    ) {
         var message = new Message();
 
         // 两个查询：
@@ -96,43 +107,45 @@ public abstract class AbstractMessageEvent {
         //     关联Entity的互动流还是Group的互动流，获取互动流的 ID
 
         // 查询发送者实体
-        var senderEntity = em.createQuery(
-            "select entity from InteractionEntity entity"
-              + " where entity.platform = :platform and entity.platformUserId = :platformId",
-            InteractionEntity.class
-          )
-          .setParameter("platform", this.messageMeta.platform())
-          .setParameter("platformId", this.messageMeta.senderInfo().platformId())
-          .getSingleResult();
+        var senderEntity = interactionEntityManager.get(
+          em,
+          this.messageMeta.platform(),
+          this.messageMeta.senderInfo().platformId()
+        );
         message.setSender(senderEntity);
 
         // 查询互动流
         var streamInfo = this.messageMeta.streamInfo();
+        InteractionStream stream;
         switch (streamInfo.streamType()) {
             case PRIVATE -> {
-                var stream =
-                  em.createQuery(
-                      "select stream from InteractionStream stream"
-                        + " join stream.entity entity"
-                        + " where entity.platform = :platform and entity.platformUserId = :platformUserId",
-                      InteractionStream.class
-                    )
-                    .setParameter("platform", this.messageMeta.platform())
-                    .setParameter("platformUserId", streamInfo.privateInfo().platformId())
-                    .getSingleResult();
+                var ie = requireNonNull(interactionEntityManager.get(
+                  em,
+                  this.messageMeta.platform(),
+                  streamInfo.privateInfo().platformId()
+                ));
+
+                stream = requireNonNull(interactionStreamManager.getOrCreateIfAbsent(
+                  em,
+                  StreamType.PRIVATE,
+                  ie,
+                  null
+                ));
                 message.setStream(stream);
             }
             case GROUP -> {
-                var stream =
-                  em.createQuery(
-                      "select stream from InteractionStream stream"
-                        + " join stream.group group"
-                        + " where group.platform = :platform and group.platformGroupId = :platformGroupId",
-                      InteractionStream.class
-                    )
-                    .setParameter("platform", this.messageMeta.platform())
-                    .setParameter("platformGroupId", streamInfo.groupInfo().platformId())
-                    .getSingleResult();
+                var ig = requireNonNull(interactionGroupManager.get(
+                  em,
+                  this.messageMeta.platform(),
+                  streamInfo.groupInfo().platformId()
+                ));
+
+                stream = requireNonNull(interactionStreamManager.getOrCreateIfAbsent(
+                  em,
+                  StreamType.GROUP,
+                  null,
+                  ig
+                ));
                 message.setStream(stream);
             }
             case GROUP_TEMP -> {
@@ -145,10 +158,14 @@ public abstract class AbstractMessageEvent {
 
         message.setTimestamp(this.timestamp);
         message.setSequence(this.serialNo.sNo());
-        message.setContent(this.toPromptString());
+        message.setPromptStr(this.toPromptString());
         message.setObjectType(this.objectType);
 
         return message;
+    }
+
+    public <T> T unwarp(Class<T> clazz) {
+        return UnwrapUtils.unwrap(clazz, this);
     }
 
     /**

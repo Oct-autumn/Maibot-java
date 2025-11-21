@@ -14,6 +14,7 @@ import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RepositoryPolicy;
 import org.eclipse.aether.resolution.ArtifactDescriptorPolicy;
+import org.eclipse.aether.resolution.ResolutionErrorPolicy;
 import org.eclipse.aether.supplier.RepositorySystemSupplier;
 import org.eclipse.aether.util.graph.transformer.ConfigurableVersionSelector;
 import org.eclipse.aether.util.graph.transformer.ConflictResolver;
@@ -26,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 public class ResolverBooter {
-    public static List<String> SCOPE_PRIORITY = List.of("compile", "runtime", "provided", "system", "test");
+    public static final List<String> SCOPE_PRIORITY = List.of("compile", "runtime", "provided", "system", "test");
 
     public static RepositorySystem newRepositorySystem() {
         RepositorySystemSupplier supplier = new RepositorySystemSupplier() {
@@ -122,7 +123,7 @@ public class ResolverBooter {
           .setDependencyGraphTransformer(depGraphTransformer)
           .setCache(new DefaultRepositoryCache())
           .setDependencySelector(new RequiredCompileDependencySelector())
-          .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.STRICT))
+          .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.IGNORE_INVALID))
           .build();
     }
 

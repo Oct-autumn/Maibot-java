@@ -12,20 +12,22 @@ import java.util.Objects;
 @IdClass(GroupMember.GroupMemberId.class)
 public class GroupMember {
     @Id
+    @Column(name = "entity_id")
     private Long entityId;
 
     @Id
+    @Column(name = "group_id")
     private Long groupId;
 
     @Column(name = "card_name")
     private String cardName;
 
     @ManyToOne
-    @JoinColumn(name = "entityId", insertable = false, updatable = false)
+    @JoinColumn(name = "entity_id", referencedColumnName = "id")
     private InteractionEntity entity;
 
     @ManyToOne
-    @JoinColumn(name = "groupId", insertable = false, updatable = false)
+    @JoinColumn(name = "group_id", referencedColumnName = "id")
     private InteractionGroup group;
 
     @Column(name = "created_at", nullable = false)
@@ -93,20 +95,20 @@ public class GroupMember {
     }
 
     public static class GroupMemberId {
-        private Long entityId;
         private Long groupId;
+        private Long entityId;
 
         public GroupMemberId() {
         }
 
-        public GroupMemberId(Long entityId, Long groupId) {
-            this.entityId = entityId;
+        public GroupMemberId(Long groupId, Long entityId) {
             this.groupId = groupId;
+            this.entityId = entityId;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(entityId, groupId);
+            return Objects.hash(groupId, entityId);
         }
 
         // equals and hashCode methods should be implemented for composite key

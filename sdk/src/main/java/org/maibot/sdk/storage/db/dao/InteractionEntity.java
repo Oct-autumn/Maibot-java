@@ -31,7 +31,7 @@ public class InteractionEntity {
     private String nickname;
 
     @ManyToOne
-    @JoinColumn(name = "personId", nullable = false, foreignKey = @ForeignKey(name = "FK_InteractionEntity_Person"))
+    @JoinColumn(name = "person_id", referencedColumnName = "id", nullable = false)
     private Person person;
 
     @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL)

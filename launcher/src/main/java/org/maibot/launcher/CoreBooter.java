@@ -31,7 +31,7 @@ public class CoreBooter {
                 mainMethod.invoke(null, (Object) new String[]{coreLaunchArgs});
             } catch (InvocationTargetException e) {
                 // Maibot Core 的主方法抛出的错误
-                log.error("Maibot Core 运行时发生错误", e);
+                log.error("Maibot Core 运行时发生错误", e.getCause());
                 System.exit(1);
             }
         } catch (ReflectiveOperationException e) {

@@ -14,6 +14,7 @@ public class SystemEventService implements DestroyableComponent {
 
     public SystemEventService() {
         this.channel = new EmbeddedChannel();
+        log.info("系统事件服务已启动");
     }
 
     public void addHandler(String name, ChannelHandler handler) {
@@ -22,6 +23,10 @@ public class SystemEventService implements DestroyableComponent {
 
     public void removeHandler(String name) {
         this.channel.pipeline().remove(name);
+    }
+
+    public void fireEvent(Object event) {
+        this.channel.pipeline().fireUserEventTriggered(event);
     }
 
     @Override

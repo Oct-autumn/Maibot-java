@@ -12,7 +12,7 @@ public class ThinkingFlowFactory {
 
     @AutoInject
     private ThinkingFlowFactory(
-      @Value("thinking.observation_window_size") int observationWindowSize
+      @Value("${thinking.observation_window_size}") int observationWindowSize
     ) {
         this.observationWindowSize = observationWindowSize;
     }
@@ -24,9 +24,6 @@ public class ThinkingFlowFactory {
 
 
     public ThinkingFlow build() {
-        return new ThinkingFlow(
-          this.observationWindowSize,
-          this.flowId
-        );
+        return new ThinkingFlow(this.observationWindowSize, this.flowId);
     }
 }

@@ -5,75 +5,71 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceConfiguration;
+import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.exception.FlywayValidateException;
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.maibot.core.cache.GlobalCacheManagerImpl;
-import org.maibot.core.config.MainConfig;
 import org.maibot.core.util.TaskExecuteServiceImpl;
-import org.maibot.sdk.storage.db.DatabaseService;
-import org.maibot.sdk.storage.db.dao.DatabaseVersion;
 import org.maibot.sdk.exceptions.DbOperationException;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.exceptions.NotInitialized;
 import org.maibot.sdk.ioc.AutoInject;
 import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.ioc.DestroyableComponent;
-import org.maibot.sdk.ioc.Value;
-import org.semver4j.Semver;
+import org.maibot.sdk.storage.db.DatabaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Objects.requireNonNull;
+
 @Component
 public class DatabaseServiceImpl implements DestroyableComponent, DatabaseService {
-    private static final Logger log         = LoggerFactory.getLogger(DatabaseServiceImpl.class);
-    private static final Semver SUPPORT_VER = new Semver("0.1.0");
+    private static final Logger log = LoggerFactory.getLogger(DatabaseServiceImpl.class);
 
     private final TaskExecuteServiceImpl taskExecutorService;
 
     private EntityManagerFactory entityManagerFactory = null;
 
     @AutoInject
-    DatabaseServiceImpl(
-      @Value("${local_data.database}") MainConfig.LocalData.Database conf,
-      TaskExecuteServiceImpl taskExecutorService,
-      GlobalCacheManagerImpl globalCacheManager
-    ) {
+    DatabaseServiceImpl(TaskExecuteServiceImpl taskExecutorService, GlobalCacheManagerImpl globalCacheManager) {
         this.taskExecutorService = taskExecutorService;
-        this.init(conf, globalCacheManager);
+        this.init(globalCacheManager);
     }
 
     /**
      * 初始化数据库管理器（独立方法，用于热重载）
      *
-     * @param conf 数据库配置
+     * @param globalCacheManager 全局缓存管理器
      */
-    public void init(MainConfig.LocalData.Database conf, GlobalCacheManagerImpl globalCacheManager) {
-        // 检查sqlitePath文件是否存在，不存在则创建
-
-        var dbFile = new File(conf.sqlitePath());
-        if (!dbFile.exists()) {
-            var parent = dbFile.getParentFile();
-            if (parent != null && !parent.exists()) {
-                if (!parent.mkdirs()) {
-                    throw new FatalError("Failed to create directories for database file: %s", conf.sqlitePath());
-                }
-            }
-            try {
-                var res = dbFile.createNewFile();
-            } catch (IOException e) {
-                throw new FatalError("Failed to create database file: %s", conf.sqlitePath(), e);
-            }
-        }
-
+    public void init(GlobalCacheManagerImpl globalCacheManager) {
         // 获取配置
-        var cfg = getDbConfiguration(conf, globalCacheManager);
+        var cfg = getSQLiteConfiguration();
+
+        // 二级缓存使用的缓存管理器
+        cfg.property("hibernate.javax.cache.cache_manager", globalCacheManager.cacheManager());
+
+        // Debug: 开发时开启 SQL 日志
+        cfg.property("hibernate.show_sql", "true");
+        cfg.property("hibernate.format_sql", "true");
+
+
+        try {
+            flywayCheckAndMigrate(cfg);
+        } catch (FlywayValidateException e) {
+            log.error("数据库版本验证失败，可能是由于数据库文件损坏或版本过旧引起的");
+            throw new FatalError("Database migration validation failed. Please check the database state.", e);
+        } catch (FlywayException e) {
+            throw new FatalError("Database migration failed", e);
+        }
 
         // 注册实体类
         Set<Class<?>> entityClasses = new HashSet<>();
@@ -98,67 +94,53 @@ public class DatabaseServiceImpl implements DestroyableComponent, DatabaseServic
         });
 
         this.entityManagerFactory = new HibernatePersistenceProvider().createEntityManagerFactory(cfg);
-
-        // 检查数据库版本
-        Semver dbVer = getDbVer();
-        if (!dbVer.isApiCompatible(SUPPORT_VER)) {
-            log.warn("数据库版本与应用程序不兼容。需要: {}, 现有: {}", SUPPORT_VER.getVersion(), dbVer.getVersion());
-            throw new FatalError(
-              "Database version is not compatible with application. Required: %s, Found: %s",
-              SUPPORT_VER.getVersion(),
-              dbVer.getVersion()
-            );
-        }
     }
 
-    private static PersistenceConfiguration getDbConfiguration(
-      MainConfig.LocalData.Database conf,
-      GlobalCacheManagerImpl globalCacheManager
-    ) {
-        var cfg = new PersistenceConfiguration("maibot-pu");
-        // SQLite 配置
-        // TODO: 对其他数据库的支持
-        cfg.property("hibernate.connection.driver_class", "org.sqlite.JDBC");
-        cfg.property("hibernate.connection.url", "jdbc:sqlite:" + conf.sqlitePath());
-        cfg.property("hibernate.dialect", "org.hibernate.community.dialect.SQLiteDialect");
-        cfg.property("hibernate.hbm2ddl.auto", "update");
-        cfg.property("hibernate.c3p0.min_size", 1);
-        cfg.property("hibernate.c3p0.max_size", 1);
-        cfg.property("hibernate.c3p0.timeout", 0);
+    /**
+     * 使用 Flyway 检查并迁移数据库
+     *
+     * @param cfg 持久化配置
+     * @throws FlywayException 如果验证&迁移过程中发生错误
+     */
+    private void flywayCheckAndMigrate(PersistenceConfiguration cfg)
+    throws FlywayException {
+        var properties = cfg.properties();
+        var url = requireNonNull(properties.get("hibernate.connection.url"));
+        var user = properties.get("hibernate.connection.username");
+        var pwd = properties.get("hibernate.connection.password");
 
-        cfg.property("hibernate.cache.use_second_level_cache", "true");
-        cfg.property("hibernate.cache.region.factory_class", "org.hibernate.cache.jcache.JCacheRegionFactory");
-        cfg.property("hibernate.javax.cache.cache_manager", globalCacheManager.cacheManager());
+        var flyway = Flyway.configure().dataSource(
+          url.toString(),
+          user == null ? null : user.toString(),
+          pwd == null ? null : pwd.toString()
+        ).communityDBSupportEnabled(true).locations("classpath:org/maibot/core/db_migration").load();
 
-        // 开发时开启 SQL 日志
-        cfg.property("hibernate.show_sql", "true");
-        cfg.property("hibernate.format_sql", "true");
+        flyway.migrate();
+    }
+
+    private static PersistenceConfiguration getSQLiteConfiguration() {
+        var cfg = new PersistenceConfiguration("maibot-sqlite-pu");
+
+        cfg.property("hibernate.connection.url", "jdbc:sqlite:data/maibot.db");
+
+        // 检查sqlitePath文件是否存在，不存在则创建
+        var dbFilePath = Path.of("data/maibot.db");
+        var dbFile = dbFilePath.toFile();
+        if (!dbFile.exists()) {
+            var parent = dbFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                if (!parent.mkdirs()) {
+                    throw new FatalError("Failed to create directories for database file: %s", dbFilePath);
+                }
+            }
+            try {
+                var ignore = dbFile.createNewFile();
+            } catch (IOException e) {
+                throw new FatalError("Failed to create database file: %s", dbFilePath, e);
+            }
+        }
 
         return cfg;
-    }
-
-    private Semver getDbVer() {
-        try {
-            return this.exec(em -> {
-                // 查询版本号
-                DatabaseVersion ver = em.find(DatabaseVersion.class, 0L);
-
-                if (ver == null) {
-                    ver = new DatabaseVersion();
-                    ver.setId(0L);
-                    ver.setVersion(SUPPORT_VER.getVersion());
-
-                    em.persist(ver);
-
-                    return SUPPORT_VER;
-                } else {
-                    return new Semver(ver.getVersion());
-                }
-            });
-        } catch (DbOperationException e) {
-            log.warn("获取数据库版本时发生错误，假定版本为0.0.0", e);
-            return new Semver("0.0.0");
-        }
     }
 
     @Override

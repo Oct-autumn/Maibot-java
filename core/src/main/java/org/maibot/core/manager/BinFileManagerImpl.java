@@ -16,6 +16,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * 二进制文件管理器实现
+ */
 @Component
 public class BinFileManagerImpl implements BinFileManager {
     private static final Logger log = LoggerFactory.getLogger(BinFileManagerImpl.class);
@@ -24,10 +27,10 @@ public class BinFileManagerImpl implements BinFileManager {
     private final ConcurrentMap<String, CompletableFuture<BinFileWithData>> lockMap = new ConcurrentHashMap<>();
 
     @Override
-    public BinFileWithData getOrCreatIfAbsent(EntityManager em, String wgetUrl, String fileType, byte[] binData) {
+    public BinFileWithData getOrCreatIfAbsent(EntityManager em, String hash, String fileType, byte[] binData) {
         // 使用锁对象，防止重复查询和创建
         var lockObject = new CompletableFuture<BinFileWithData>();
-        var mappedLock = lockMap.putIfAbsent(wgetUrl, lockObject);
+        var mappedLock = lockMap.putIfAbsent(hash, lockObject);
 
         if (mappedLock == null) {
             // 当前线程获得锁，执行获取或创建逻辑
@@ -35,27 +38,27 @@ public class BinFileManagerImpl implements BinFileManager {
                 // 检查实体是否存在，防止重复创建
                 BinFileWithData binFileWithData;
 
-                binFileWithData = this.get(em, wgetUrl);
+                binFileWithData = this.get(em, hash);
                 if (binFileWithData == null) {
                     // 不存在则创建新实体
-                    try (var binStream = new ByteArrayInputStream(binData)) {
-                        var hash = HashUtils.getSha256Hash(binStream);
-                        LocalBinFileUtils.saveFile(fileType, hash, binData);
+                    LocalBinFileUtils.saveFile(fileType, hash, binData);
 
-                        var newBinFile = new BinFile();
-                        newBinFile.setWgetUrl(wgetUrl);
-                        newBinFile.setHash(hash);
-                        newBinFile.setFileType(fileType);
-                        em.persist(newBinFile);
+                    var newBinFile = new BinFile();
+                    newBinFile.setHash(hash);
+                    newBinFile.setFileType(fileType);
+                    em.persist(newBinFile);
 
-                        binFileWithData = new BinFileWithData(newBinFile, binData);
-                    }
+                    binFileWithData = new BinFileWithData(newBinFile, binData);
+                } else if (binFileWithData.data() == null) {
+                    // 存在但本地文件缺失，补全本地文件
+                    LocalBinFileUtils.saveFile(fileType, hash, binData);
+                    binFileWithData = new BinFileWithData(binFileWithData.binFile(), binData);
                 }
                 // 完成锁对象，通知等待的线程
                 lockObject.complete(binFileWithData);
                 return binFileWithData;
             } catch (Exception e) {
-                log.error("获取或创建 BinFile (wgetUrl: {}) 时发生异常", wgetUrl, e);
+                log.error("获取或创建 BinFile (hash: {}) 时发生异常", hash, e);
                 lockObject.completeExceptionally(e);
                 return null;
             }
@@ -64,7 +67,7 @@ public class BinFileManagerImpl implements BinFileManager {
             try {
                 return mappedLock.get();
             } catch (Exception e) {
-                log.error("等待获取 BinFile (wgetUrl: {}) 时发生异常", wgetUrl, e);
+                log.error("等待获取 BinFile (hash: {}) 时发生异常", hash, e);
                 return null;
             }
         }
@@ -89,10 +92,10 @@ public class BinFileManagerImpl implements BinFileManager {
     }
 
     @Override
-    public BinFileWithData get(EntityManager em, String wgetUrl) {
+    public BinFileWithData get(EntityManager em, String hash) {
         try {
-            var query = em.createQuery("SELECT b FROM BinFile b WHERE b.wgetUrl = :wgetUrl", BinFile.class);
-            query.setParameter("wgetUrl", wgetUrl);
+            var query = em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile.class);
+            query.setParameter("hash", hash);
 
             var resultList = query.getResultList();
             if (resultList.isEmpty()) {
@@ -102,7 +105,7 @@ public class BinFileManagerImpl implements BinFileManager {
                 return internalGet(binFile);
             }
         } catch (Exception e) {
-            log.error("获取 BinFile (wgetUrl: {}) 时发生异常", wgetUrl, e);
+            log.error("获取 BinFile (hash: {}) 时发生异常", hash, e);
             return null;
         }
     }

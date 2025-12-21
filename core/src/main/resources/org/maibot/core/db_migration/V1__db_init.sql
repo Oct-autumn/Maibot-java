@@ -90,10 +90,9 @@ CREATE INDEX IF NOT EXISTS 'idx_message_stream'
 CREATE TABLE IF NOT EXISTS 'bin_file'
 (
     'id'          INTEGER PRIMARY KEY AUTOINCREMENT,
-    'wget_url'    VARCHAR(1024),
     'hash_sha256' VARCHAR(64)  NOT NULL,
     'file_type'   VARCHAR(255) NOT NULL,
     'created_at'  BIGINT       NOT NULL,
     'updated_at'  BIGINT       NOT NULL,
-    CONSTRAINT 'idx_bin_file_wget_url' UNIQUE ('wget_url')
+    CONSTRAINT 'idx_bin_file_hash_sha256' UNIQUE ('hash_sha256')
 );

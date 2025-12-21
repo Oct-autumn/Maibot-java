@@ -7,18 +7,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 
 @Entity
-@Table(name = "bin_file", indexes = {@Index(name = "idx_bin_file_wget_url", columnList = "wget_url")})
+@Table(name = "bin_file", indexes = {
+  @Index(name = "idx_bin_file_hash_sha256", columnList = "hash_sha256")
+})
 public class BinFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /// 文件的 wget 下载地址
-    @Column(name = "wget_url", length = 1024)
-    private String wgetUrl;
-
     /// 文件的 SHA-256 哈希值，用于文件命名和数据校验
-    @Column(name = "hash_sha256", length = 64)
+    @Column(name = "hash_sha256", length = 64, unique = true)
     private String hash;
 
     /// 文件类型，例如 png、wav 等
@@ -39,14 +37,6 @@ public class BinFile {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getWgetUrl() {
-        return wgetUrl;
-    }
-
-    public void setWgetUrl(String wgetUrl) {
-        this.wgetUrl = wgetUrl;
     }
 
     public String getHash() {

@@ -28,4 +28,12 @@ public class HashUtils {
             throw new RuntimeException("Error reading input stream", e);
         }
     }
+
+    public static String getSha256Hash(byte[] data) {
+        try (InputStream inputStream = new java.io.ByteArrayInputStream(data)) {
+            return getSha256Hash(inputStream);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading byte array", e);
+        }
+    }
 }

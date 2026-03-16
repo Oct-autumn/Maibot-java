@@ -1,8 +1,8 @@
 package org.maibot.core.config;
 
 import org.maibot.sdk.config.ConfigService;
+import org.maibot.sdk.config.ModelApiConfig;
 import org.maibot.sdk.exceptions.FatalError;
-import org.maibot.sdk.exceptions.IgnorableException;
 import org.maibot.sdk.exceptions.InvalidConfigPath;
 import org.maibot.sdk.exceptions.NamespaceAlreadyExist;
 import org.maibot.sdk.ioc.Component;
@@ -30,6 +30,7 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     public static final  String CONFIG_DIR               = "config";
     public static final  String MOD_CONFIG_TEMPLATE_FILE = "config.template.toml";
     private static final String CORE_CONFIG_PATH         = "config.toml";
+    private static final String MODEL_CONFIG_PATH        = "model_config.toml";
 
     /// 访问语法：
     /// - <code>namespcae:field1.field2</code>: 指定命名空间，访问某个字段
@@ -52,8 +53,10 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     public void postConstruct() {
         // 确保配置目录存在
         ensureConfigDirExists();
-        // 加载core配置
-        loadCoreConfig();
+        if (!(loadCoreConfig() && loadModelConfig())) {
+            // 如果核心配置或模型配置加载失败，说明默认配置文件已创建但未修改，提示用户修改后重启程序
+            System.exit(-1);
+        }
     }
 
     /**
@@ -72,34 +75,53 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
     }
 
     /**
-     * 加载配置文件
+     * 加载核心配置文件
      */
-    private void loadCoreConfig() {
+    private boolean loadCoreConfig() {
         File configFile = new File(CORE_CONFIG_PATH);
         if (!configFile.exists()) {
             System.out.println("配置文件不存在，正在创建默认配置文件...");
-            try (var inputStream = getClass().getResourceAsStream("/org/maibot/core/config.template.toml")) {
-                if (inputStream == null) {
-                    throw new FatalError("Default core config template not found in resources.");
-                }
-                this.createDefaultConfig(CORE_CONFIG_PATH, inputStream);
-            } catch (IOException e) {
-                throw new FatalError("Failed to create default core config file.", e);
-            }
+            createDefaultConfig(CORE_CONFIG_PATH, "/org/maibot/core/config_template/config.template.toml");
             System.out.println("默认配置文件创建成功，请根据需要修改 " + CORE_CONFIG_PATH + " 后重新启动程序。");
-            System.exit(1);
+            return false;
         }
 
         // 读取Toml配置
-        var tomlReader = new TomlMapper().readerFor(MainConfig.class)
-                                         .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        var tomlReader = new TomlMapper().readerFor(CoreConfig.class)
+          .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         try {
-            MainConfig mainConfig = tomlReader.readValue(configFile);
-
-            this.putConfigNameSpace("core", objectMapper.valueToTree(mainConfig));
+            CoreConfig coreConfig = tomlReader.readValue(configFile);
+            this.putConfigNameSpace("core", objectMapper.valueToTree(coreConfig));
         } catch (JacksonException e) {
             throw new FatalError("Failed to parse core config file.", e);
         }
+
+        return true;
+    }
+
+    /**
+     * 加载模型配置文件
+     */
+    private boolean loadModelConfig() {
+        File configFile = new File(MODEL_CONFIG_PATH);
+        if (!configFile.exists()) {
+            System.out.println("Model配置文件不存在，正在创建默认LLM配置文件...");
+            createDefaultConfig(MODEL_CONFIG_PATH, "/org/maibot/core/config_template/model_config.template.toml");
+            System.out.println("默认配置文件创建成功，请根据需要修改 " + MODEL_CONFIG_PATH + " 后重新启动程序。");
+            return false;
+        }
+
+        // 读取Toml配置
+        var tomlReader = new TomlMapper().readerFor(ModelApiConfig.class)
+          .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        try {
+            ModelApiConfig modelApiConfig = tomlReader.readValue(configFile);
+            this.putConfigNameSpace("choosableModels", objectMapper.valueToTree(modelApiConfig));
+        } catch (JacksonException e) {
+            throw new FatalError("Failed to parse choosableModels config file.", e);
+        }
+
+        return true;
     }
 
     /**
@@ -120,19 +142,41 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
 
     /**
      * 创建默认的配置文件
+     *
+     * @param configFilePath       配置文件路径
+     * @param templateResourcePath 模板资源路径
+     */
+    private void createDefaultConfig(String configFilePath, String templateResourcePath) {
+        try (var inputStream = getClass().getResourceAsStream(templateResourcePath)) {
+            if (inputStream == null) {
+                throw new FatalError("Config template '%s' not found in resources.", templateResourcePath);
+            }
+            createDefaultConfig(configFilePath, inputStream);
+        } catch (IOException e) {
+            throw new FatalError(
+              "Failed to create default config file '%s'. Please check the accessibility and permissions of the config directory.",
+              configFilePath,
+              e
+            );
+        }
+    }
+
+    /**
+     * 创建默认的配置文件
+     *
+     * @param configFilePath      配置文件路径
+     * @param templateInputStream 模板输入流
      */
     private void createDefaultConfig(String configFilePath, InputStream templateInputStream) {
         try {
             File configFile = new File(configFilePath);
-            if (configFile.exists()) {
-                // 调用前应检查文件是否存在，这里抛出异常以防万一
-                throw new IgnorableException("Config file '%s' already exists.", configFilePath);
+            if (!configFile.exists()) {
+                Files.copy(templateInputStream, configFile.toPath());
             }
-            Files.copy(templateInputStream, configFile.toPath());
         } catch (IOException e) {
             throw new FatalError(
               "Failed to create default config file '%s'. Please check the accessibility and permissions of the config directory.",
-              CORE_CONFIG_PATH,
+              configFilePath,
               e
             );
         }
@@ -172,7 +216,7 @@ public class ConfigServiceImpl implements ConfigService, InitializableComponent 
         // 根据配置文件的文件名后缀选择解析器
         if (configFile.getName().endsWith(".toml")) {
             var tomlReader = new TomlMapper().readerFor(configClass)
-                                             .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+              .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
             try {
                 T rawJsonMap = tomlReader.readValue(configFile);
 

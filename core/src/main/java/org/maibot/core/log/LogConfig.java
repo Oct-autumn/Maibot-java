@@ -10,7 +10,7 @@ import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
 import ch.qos.logback.core.util.FileSize;
 import org.jline.reader.LineReader;
-import org.maibot.core.config.MainConfig;
+import org.maibot.core.config.CoreConfig;
 import org.maibot.core.ioc.Instance;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public class LogConfig {
       "OFF"
     ));
 
-    public static void configure(MainConfig.Log conf) {
+    public static void configure(CoreConfig.Log conf) {
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         Logger rootLogger = context.getLogger("ROOT");
         rootLogger.setLevel(Level.TRACE); // 将日志级别设置为 TRACE，以便过滤器可以处理所有级别的日志
@@ -60,7 +60,7 @@ public class LogConfig {
 
     public static CustomTerminalAppender getTerminalAppender(
       LoggerContext context,
-      MainConfig.Log.ConsoleLogSettings conf
+      CoreConfig.Log.ConsoleLogSettings conf
     ) {
         var terminalAppender = Instance.get(CustomTerminalAppender.class);
         terminalAppender.setName("terminal");
@@ -95,7 +95,7 @@ public class LogConfig {
 
     private static FileAppender<ILoggingEvent> getFileAppender(
       LoggerContext context,
-      MainConfig.Log.FileLogSettings conf
+      CoreConfig.Log.FileLogSettings conf
     ) {
         var fileAppender = new RollingFileAppender<ILoggingEvent>();
         fileAppender.setName("file");

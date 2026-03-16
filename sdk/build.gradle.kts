@@ -48,6 +48,9 @@ dependencies {
 
     // Jetbrains Annotations
     implementation("org.jetbrains:annotations:24.0.1")
+    
+    // OpenAI API
+    implementation("com.openai:openai-java:4.13.0")
 }
 
 // Create build-inf.properties

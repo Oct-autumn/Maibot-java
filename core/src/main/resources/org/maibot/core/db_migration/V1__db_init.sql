@@ -96,3 +96,29 @@ CREATE TABLE IF NOT EXISTS 'bin_file'
     'updated_at'  BIGINT       NOT NULL,
     CONSTRAINT 'idx_bin_file_hash_sha256' UNIQUE ('hash_sha256')
 );
+
+-- ModelApiRequest Table
+CREATE TABLE IF NOT EXISTS 'model_api_request'
+(
+    'id'            INTEGER PRIMARY KEY AUTOINCREMENT,
+    'timestamp'     BIGINT       NOT NULL,
+    'task_name'     VARCHAR(255) NOT NULL,
+    'model_name'    VARCHAR(255) NOT NULL,
+    'api_provider'  VARCHAR(255) NOT NULL,
+    'input_tokens'  INTEGER      NOT NULL,
+    'output_tokens' INTEGER      NOT NULL,
+    'total_cost'    REAL         NOT NULL
+);
+
+---- Index - timestamp
+CREATE INDEX IF NOT EXISTS 'idx_model_api_request_timestamp'
+    ON 'model_api_request' ('timestamp');
+---- Index - task_name
+CREATE INDEX IF NOT EXISTS 'idx_model_api_request_task_name'
+    ON 'model_api_request' ('task_name');
+---- Index - model_name
+CREATE INDEX IF NOT EXISTS 'idx_model_api_request_model_name'
+    ON 'model_api_request' ('model_name');
+---- Index - api_provider
+CREATE INDEX IF NOT EXISTS 'idx_model_api_request_api_provider'
+    ON 'model_api_request' ('api_provider');

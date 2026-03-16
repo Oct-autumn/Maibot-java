@@ -19,7 +19,7 @@ package org.maibot.core;
 
 import org.maibot.core.commandline.TerminalController;
 import org.maibot.core.config.BuildInfo;
-import org.maibot.core.config.MainConfig;
+import org.maibot.core.config.CoreConfig;
 import org.maibot.core.ioc.Instance;
 import org.maibot.core.log.LogConfig;
 import org.maibot.core.modloader.ModManager;
@@ -114,7 +114,7 @@ public class MaibotMain {
         System.out.printf("> SDK Version: %s <\n", buildInfo.sdkVersion().getVersion());
 
         var configService = Instance.get(ConfigService.class);
-        LogConfig.configure(configService.getConfig("log", MainConfig.Log.class));
+        LogConfig.configure(configService.getConfig("log", CoreConfig.Log.class));
         log.info("日志系统初始化完成");
         // <!-- 从此处开始可以正常使用Logger -->
 

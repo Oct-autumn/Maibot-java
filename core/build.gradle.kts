@@ -81,6 +81,9 @@ dependencies {
     implementation("info.picocli:picocli-shell-jline3:4.7.7")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
+    // OpenAI API
+    implementation("com.openai:openai-java:4.13.0")
+
     // SDK Dependency
     implementation(project(":sdk"))
 }

@@ -83,7 +83,7 @@ public abstract class AbstractMessageEvent {
     /**
      * 将消息转化为提示词字符串
      */
-    public abstract String toPromptString();
+    public abstract String toPromptString(EntityManager em);
 
     /**
      * 将消息的额外字段转化为数据库存储对象
@@ -158,7 +158,7 @@ public abstract class AbstractMessageEvent {
 
         message.setTimestamp(this.timestamp);
         message.setSequence(this.serialNo.sNo());
-        message.setPromptStr(this.toPromptString());
+        message.setPromptStr(this.toPromptString(em));
         message.setObjectType(this.objectType);
 
         return message;

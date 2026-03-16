@@ -11,7 +11,7 @@ import java.util.List;
  * 请将字段设为final以防止意外修改
  */
 @SuppressWarnings("unused") // 抑制警告：未使用
-public record MainConfig(
+public record CoreConfig(
   @JsonProperty(value = "version", required = true) String version,
   @JsonProperty(value = "bot_info", required = true) BotInfo botInfo,
   @JsonProperty(value = "log", required = true) Log log,

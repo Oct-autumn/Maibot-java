@@ -7,7 +7,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import org.maibot.core.config.MainConfig;
+import org.maibot.core.config.CoreConfig;
 import org.maibot.core.util.TaskExecuteServiceImpl;
 import org.maibot.sdk.exceptions.FatalError;
 import org.maibot.sdk.ioc.AutoInject;
@@ -29,14 +29,14 @@ public class InnerServer implements DestroyableComponent {
     private final ServerBootstrap        bootstrap;
     private final TaskExecuteServiceImpl taskExecutorService;
 
-    private final MainConfig.Network conf;
+    private final CoreConfig.Network conf;
 
     private IoEventLoopGroup bossGroup;
     private IoEventLoopGroup workerGroup;
 
     @AutoInject
     public InnerServer(
-      @Value("${network}") MainConfig.Network conf,
+      @Value("${network}") CoreConfig.Network conf,
       TaskExecuteServiceImpl taskExecutorService,
       DispatchHandler dispatchHandler,
       ExceptionHandler exceptionHandler

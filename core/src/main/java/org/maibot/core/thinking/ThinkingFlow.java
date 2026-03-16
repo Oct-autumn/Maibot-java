@@ -2,9 +2,9 @@ package org.maibot.core.thinking;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.storage.db.dao.InteractionStream;
 import org.maibot.sdk.storage.db.dao.Message;
-import org.maibot.sdk.ioc.Component;
 import org.maibot.sdk.storage.domain.StreamType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

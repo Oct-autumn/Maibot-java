@@ -1,20 +1,40 @@
-package org.maibot.core;
+package org.maibot.core
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonProperty
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.KotlinModule
 
-public record LaunchArgs(
-  @JsonProperty("mod_list") @JsonPropertyDescription("要加载的Mod的绝对路径列表") String[] modList
+data class LaunchArgs(
+    @field:JsonProperty("mod_list") val modList: Array<String>
 ) {
-    public static LaunchArgs parse(String args) {
-        // 解析启动参数
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            return mapper.readValue(args, LaunchArgs.class);
-        } catch (JacksonException e) {
-            throw new RuntimeException("解析启动参数失败", e);
+    companion object {
+        fun parse(args: String): LaunchArgs {
+            // 解析启动参数
+            val reader = JsonMapper.builder()
+                .addModule(KotlinModule.Builder().build())
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build()
+                .readerFor(LaunchArgs::class.java)
+            try {
+                return reader.readValue(args)
+            } catch (e: JacksonException) {
+                throw RuntimeException("解析启动参数失败", e)
+            }
         }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as LaunchArgs
+
+        return modList.contentEquals(other.modList)
+    }
+
+    override fun hashCode(): Int {
+        return modList.contentHashCode()
     }
 }

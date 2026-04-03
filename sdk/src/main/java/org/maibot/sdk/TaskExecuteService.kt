@@ -1,37 +1,30 @@
-package org.maibot.sdk;
+package org.maibot.sdk
 
-import org.maibot.sdk.ioc.DestroyableComponent;
-
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import org.maibot.sdk.ioc.DestroyableComponent
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
 
 /**
  * 任务执行服务接口
  */
-public abstract class TaskExecuteService implements DestroyableComponent {
+@Suppress("unused")
+abstract class TaskExecuteService : DestroyableComponent {
+    abstract fun executor(): ExecutorService
 
-    abstract public ExecutorService executor();
-
-    abstract public ExecutorService virtualExecutor();
+    abstract fun virtualExecutor(): ExecutorService
 
     /**
      * 提交任务到执行器
-     *
+     * 
      * @param task 任务Callable
      * @param virT 是否使用虚拟线程
      * @return 任务Future
      */
-    abstract public <T> CompletableFuture<T> submit(Callable<T> task, boolean virT);
+    abstract fun <T> submit(virT: Boolean, task: () -> T): CompletableFuture<T>
 
-    /**
-     * 提交任务到执行器
-     *
-     * @param task 任务Runnable
-     * @param virT 是否使用虚拟线程
-     * @return 任务Future
-     */
-    abstract public CompletableFuture<Object> submit(Runnable task, boolean virT);
-
-    abstract public <T> CompletableFuture<T> newCompletableFuture(boolean virT);
+    fun submit(virT: Boolean, task: Runnable): CompletableFuture<Unit> {
+        return submit(virT) {
+            task.run()
+        }
+    }
 }

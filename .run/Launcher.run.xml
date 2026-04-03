@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Launcher" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="21" />
+    <option name="ALTERNATIVE_JRE_PATH" value="25" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="org.maibot.launcher.LauncherMain" />
     <module name="Maibot-java.launcher.main" />
@@ -9,6 +9,7 @@
     <option name="VM_PARAMETERS" value="-Xms512m -Xmx1g" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/launcher/run" />
     <method v="2">
+      <option name="Gradle.BeforeRunTask" enabled="false" tasks="publishToMavenLocal" externalProjectPath="$PROJECT_DIR$/sdk" vmOptions="" scriptParameters="" />
       <option name="Gradle.BeforeRunTask" enabled="false" tasks="jarAndMove" externalProjectPath="$PROJECT_DIR$/core" vmOptions="" scriptParameters="" />
       <option name="Make" enabled="true" />
     </method>

@@ -1,206 +1,198 @@
-package org.maibot.core.log;
+package org.maibot.core.log
 
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.AppenderBase;
-import lombok.Setter;
-import org.jline.reader.LineReader;
-import org.maibot.core.util.AnsiFormatter;
-import org.maibot.sdk.ioc.AutoInject;
-import org.maibot.sdk.ioc.Value;
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.AppenderBase
+import org.jline.reader.LineReader
+import org.maibot.core.util.AnsiFormatter.render
+import org.maibot.sdk.ioc.AutoInject
+import org.maibot.sdk.ioc.Value
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.*
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.StringJoiner;
-import java.util.stream.Stream;
+class CustomTerminalAppender
+@AutoInject private constructor(
+    @Value($$"${log.enable_mdc_track}") private val enableMdcTrack: Boolean
+) : AppenderBase<ILoggingEvent>() {
+    var lineReader: LineReader? = null
 
-public class CustomTerminalAppender extends AppenderBase<ILoggingEvent> {
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss");
-
-    private static final String LOG_TEMPLATE          = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@:\n\t@{{3} {6}}@\n{7}";
-    private static final String LOG_TEMPLATE_WITH_MDC = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ {6}:\n\t@{{3} {7}}@\n{8}";
-    private static final String MDC_TEMPLATE          = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@";
-    private static final String THROWABLE_TEMPLATE    = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n";
-
-    private final boolean    enableMdcTrack;
-    @Setter
-    private       LineReader lineReader;
-
-    @AutoInject
-    public CustomTerminalAppender(@Value("${log.enable_mdc_track}") boolean enableMdcTrack) {
-        this.enableMdcTrack = enableMdcTrack;
-    }
-
-    @Override
-    protected void append(ILoggingEvent eventObject) {
+    override fun append(eventObject: ILoggingEvent) {
         try {
-            String msg = encode(eventObject);
-            if (lineReader != null) {
-                lineReader.printAbove(msg);
-            } else {
-                System.out.print(msg);
-            }
-        } catch (Exception ignore) {
+            val msg = encode(eventObject)
+
+            // 若LineReader可用，则使用printAbove方法输出日志；
+            // 否则直接使用System.out.print输出
+            lineReader?.printAbove(msg) ?: print(msg)
+        } catch (e: Exception) {
             // 处理异常
+            System.err.println("日志输出失败: " + e.message)
         }
     }
 
-    private String encode(ILoggingEvent event) {
-        var levelColor = switch (event.getLevel().toString()) {
-            case "TRACE" -> "FG_BRIGHT_BLACK";
-            case "DEBUG" -> "FG_BLUE";
-            case "INFO" -> "FG_GREEN";
-            case "WARN" -> "FG_YELLOW";
-            case "ERROR" -> "FG_RED";
-            default -> "FG_DEFAULT";
-        };
+    private fun encode(event: ILoggingEvent): String {
+        val levelColor = when (event.level.toString()) {
+            "TRACE" -> "FG_BRIGHT_BLACK"
+            "DEBUG" -> "FG_BLUE"
+            "INFO" -> "FG_GREEN"
+            "WARN" -> "FG_YELLOW"
+            "ERROR" -> "FG_RED"
+            else -> "FG_DEFAULT"
+        }
 
         if (enableMdcTrack) {
-            return AnsiFormatter.render(
-              LOG_TEMPLATE_WITH_MDC,
-              DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
-              event.getThreadName(),
-              levelColor,
-              String.format("%-5s", event.getLevel()),
-              compressLoggerName(event.getLoggerName(), 30),
-              renderMDC(event),
-              event.getFormattedMessage(),
-              renderThrowable(event)
-            );
+            return render(
+                LOG_TEMPLATE_WITH_MDC,
+                DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.timeStamp).atZone(ZoneId.systemDefault())),
+                event.threadName,
+                levelColor,
+                String.format("%-5s", event.level),
+                compressLoggerName(event.loggerName, 30),
+                renderMDC(event),
+                event.formattedMessage,
+                renderThrowable(event)
+            )
         } else {
-            return AnsiFormatter.render(
-              LOG_TEMPLATE,
-              DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.getTimeStamp()).atZone(ZoneId.systemDefault())),
-              event.getThreadName(),
-              levelColor,
-              String.format("%-5s", event.getLevel()),
-              compressLoggerName(event.getLoggerName(), 30),
-              event.getFormattedMessage(),
-              renderThrowable(event)
-            );
+            return render(
+                LOG_TEMPLATE,
+                DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(event.timeStamp).atZone(ZoneId.systemDefault())),
+                event.threadName,
+                levelColor,
+                String.format("%-5s", event.level),
+                compressLoggerName(event.loggerName, 30),
+                event.formattedMessage,
+                renderThrowable(event)
+            )
         }
-
     }
 
     /**
      * 渲染MDC信息
-     *
+     * 
      * @param event 日志事件
      * @return 渲染后的MDC信息字符串
      */
-    private String renderMDC(ILoggingEvent event) {
-        if (event.getMDCPropertyMap().isEmpty()) {
-            return "";
+    private fun renderMDC(event: ILoggingEvent): String {
+        if (event.mdcPropertyMap.isEmpty()) {
+            return ""
         }
 
-        Stream<String> mdcEntries = event.getMDCPropertyMap().entrySet().stream()
-                                         .map(entry -> AnsiFormatter.render(
-                                           MDC_TEMPLATE,
-                                           entry.getKey(),
-                                           entry.getValue()
-                                         ));
+        val mdcEntries = event.mdcPropertyMap.entries.stream().map { entry: MutableMap.MutableEntry<String, String> ->
+            render(
+                MDC_TEMPLATE, entry.key, entry.value
+            )
+        }
 
-        StringJoiner mdcBuilder = new StringJoiner(", ", "[", "]");
-        mdcEntries.forEach(mdcBuilder::add);
+        val mdcBuilder = StringJoiner(", ", "[", "]")
+        mdcEntries.forEach { newElement: String -> mdcBuilder.add(newElement) }
 
-        return mdcBuilder.toString();
+        return mdcBuilder.toString()
     }
 
     /**
      * 渲染异常信息
-     *
+     * 
      * @param event 日志事件
      * @return 渲染后的异常信息字符串
      */
-    private String renderThrowable(ILoggingEvent event) {
-        if (event.getThrowableProxy() == null) {
-            return "";
+    private fun renderThrowable(event: ILoggingEvent): String {
+        if (event.throwableProxy == null) {
+            return ""
         }
 
-        var throwableBuilder = new StringBuilder();
+        val throwableBuilder = StringBuilder()
 
-        var throwableProxy = event.getThrowableProxy();
+        var throwableProxy = event.throwableProxy
         while (throwableProxy != null) {
-            var firstLineBuilder = new StringBuilder();
-            firstLineBuilder.append("Exception in thread")
-                            .append(" \"").append(event.getThreadName()).append("\" ")
-                            .append(throwableProxy.getClassName());
-            if (throwableProxy.getMessage() != null) {
-                firstLineBuilder.append(": ").append(throwableProxy.getMessage());
+            val firstLineBuilder = StringBuilder()
+            firstLineBuilder.append("Exception in thread").append(" \"").append(event.threadName).append("\" ")
+                .append(throwableProxy.className)
+
+            throwableProxy.message?.let {
+                firstLineBuilder.append(": ").append(it)
             }
 
-            var stackTraceBuilder = new StringBuilder();
-            var stackTraceElements = throwableProxy.getStackTraceElementProxyArray();
-            for (var element : stackTraceElements) {
-                stackTraceBuilder.append("    ")
-                                 .append(element.getSTEAsString())
-                                 .append("\n");
+            val stackTraceBuilder = StringBuilder()
+            val stackTraceElements = throwableProxy.stackTraceElementProxyArray
+            for (element in stackTraceElements) {
+                stackTraceBuilder.append("    ").append(element!!.steAsString).append("\n")
             }
 
-            throwableBuilder.append(AnsiFormatter.render(
-              THROWABLE_TEMPLATE,
-              firstLineBuilder.toString(),
-              stackTraceBuilder.toString()
-            ));
+            throwableBuilder.append(
+                render(
+                    THROWABLE_TEMPLATE, firstLineBuilder.toString(), stackTraceBuilder.toString()
+                )
+            )
 
-            throwableProxy = throwableProxy.getCause();
+            throwableProxy = throwableProxy.cause
         }
 
-        return throwableBuilder.toString();
+        return throwableBuilder.toString()
     }
 
     /**
      * 压缩LoggerName
-     * <p>
-     * 当超出指定长度时，依次进行以下压缩尝试： <br>
-     * 1. 对于点分割的LoggerName，尝试将前缀包名缩写为首字母，直到不超出长度或无法再压缩为止。 <br>
-     * 1.1. 若全部前缀包名压缩后仍然超出长度，则继续尝试移除最后一个包名的中间部分（中间用...连接），直到不超出长度或无法再压缩为止。 <br>
-     * 2. 对于非点分割的LoggerName，尝试移除中间部分（中间用...连接），直到不超出长度或无法再压缩为止。 <br>
-     *
+     * 
+     * 
+     * 当超出指定长度时，依次进行以下压缩尝试： <br></br>
+     * 1. 对于点分割的LoggerName，尝试将前缀包名缩写为首字母，直到不超出长度或无法再压缩为止。 <br></br>
+     * 1.1. 若全部前缀包名压缩后仍然超出长度，则继续尝试移除最后一个包名的中间部分（中间用...连接），直到不超出长度或无法再压缩为止。 <br></br>
+     * 2. 对于非点分割的LoggerName，尝试移除中间部分（中间用...连接），直到不超出长度或无法再压缩为止。 <br></br>
+     * 
      * @param loggerName 原始LoggerName
      * @param maxLen     最大长度
      * @return 压缩后的LoggerName
      */
-    private String compressLoggerName(String loggerName, int maxLen) {
-        if (loggerName.length() <= maxLen) {
-            return loggerName;
+    private fun compressLoggerName(loggerName: String, maxLen: Int): String {
+        if (loggerName.length <= maxLen) {
+            return loggerName
         }
 
-        String[] parts = loggerName.split("\\.");
-        if (parts.length > 1) {
+        val parts = loggerName.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        if (parts.size > 1) {
             // 点分割的LoggerName，尝试缩写包名
-            for (int i = 0; i < parts.length - 1; i++) {
-                if (parts[i].length() > 1) {
-                    parts[i] = parts[i].substring(0, 1); // 缩写为首字母
+            for (i in 0..<parts.size - 1) {
+                if (parts[i].length > 1) {
+                    parts[i] = parts[i].substring(0, 1) // 缩写为首字母
                 }
-                String compressed = String.join(".", parts);
-                if (compressed.length() <= maxLen) {
-                    return compressed;
+                val compressed = parts.joinToString(".")
+                if (compressed.length <= maxLen) {
+                    return compressed
                 }
             }
+
             // 如果全部前缀包名缩写后仍然超出长度，尝试移除最后一个包名的中间部分
-            String lastPart = parts[parts.length - 1];
-            int availableLen = maxLen - (loggerName.length() - lastPart.length()) - 3; // 3是"..."的长度
-            if (availableLen > 0 && lastPart.length() > availableLen) {
-                return String.join(".", Arrays.copyOf(parts, parts.length - 1)) + "." +
-                  lastPart.substring(
-                    0,
-                    availableLen / 2
-                  ) + "..." + lastPart.substring(lastPart.length() - availableLen / 2);
+            val lastPart = parts[parts.size - 1]
+            val availableLen = maxLen - (loggerName.length - lastPart.length) - 3 // 3是"..."的长度
+            if (availableLen > 0 && lastPart.length > availableLen) {
+                return parts.mapIndexed { idx, part ->
+                    if (idx < parts.size - 1) part else // 移除最后一个包名的中间部分
+                        part.substring(0, availableLen / 2) + "..." + part.substring(
+                            part.length - availableLen / 2
+                        )
+                }.joinToString(".")
             }
         } else {
             // 非点分割的LoggerName，尝试移除中间部分
-            int availableLen = maxLen - 3; // 3是"..."的长度
-            if (availableLen > 0 && loggerName.length() > availableLen) {
+            val availableLen = maxLen - 3 // 3是"..."的长度
+            if (availableLen > 0 && loggerName.length > availableLen) {
                 return loggerName.substring(
-                  0,
-                  availableLen / 2
-                ) + "..." + loggerName.substring(loggerName.length() - availableLen / 2);
+                    0, availableLen / 2
+                ) + "..." + loggerName.substring(loggerName.length - availableLen / 2)
             }
         }
 
         // 无法压缩到指定长度，返回原始名称
-        return loggerName;
+        return loggerName
+    }
+
+    companion object {
+        private val DATE_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss")
+
+        private const val LOG_TEMPLATE = "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@:\n\t@{{3} {6}}@\n{7}"
+        private const val LOG_TEMPLATE_WITH_MDC =
+            "{1} @{FG_BRIGHT_CYAN [{2}]}@ @{{3} {4}}@ @{FG_CYAN {5}}@ {6}:\n\t@{{3} {7}}@\n{8}"
+        private const val MDC_TEMPLATE = "@{FG_MAGENTA,BOLD {1}}@=@{FG_MAGENTA {2}}@"
+        private const val THROWABLE_TEMPLATE = "@{FG_RED,BOLD {1}}@\n@{FG_RED,FAINT {2}}@\n"
     }
 }

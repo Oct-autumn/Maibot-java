@@ -1,5 +1,3 @@
-package org.maibot.sdk.eventchannel;
+package org.maibot.sdk.eventchannel
 
-public interface GlobalEventService {
-
-}
+interface GlobalEventService 

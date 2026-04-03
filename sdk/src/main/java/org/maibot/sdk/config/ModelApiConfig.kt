@@ -1,37 +1,36 @@
-package org.maibot.sdk.config;
+package org.maibot.sdk.config
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty
 
-import java.util.List;
-
-public record ModelApiConfig(
-  @JsonProperty(value = "version", required = true) String version,
-  @JsonProperty(value = "api_providers") List<ApiProvider> apiProviders,
-  @JsonProperty(value = "models") List<Model> models
+@JvmRecord
+data class ModelApiConfig(
+    @field:JsonProperty(value = "version", required = true) val version: String,
+    @field:JsonProperty(value = "api_providers") val apiProviders: List<ApiProvider> = listOf(),
+    @field:JsonProperty(value = "models") val models: List<Model> = listOf()
 ) {
-    public record ApiProvider(
-      @JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "base_url", required = true) String baseUrl,
-      @JsonProperty(value = "api_key", required = true) String apiKey,
-      @JsonProperty(value = "client_type") String clientType,
-      @JsonProperty(value = "timeout") Integer timeout,
-      @JsonProperty(value = "default_max_retry") Integer defaultMaxRetry,
-      @JsonProperty(value = "default_temperature") Double defaultTemperature,
-      @JsonProperty(value = "default_max_tokens") Integer defaultMaxTokens
-    ) {
-    }
+    @JvmRecord
+    data class ApiProvider(
+        @field:JsonProperty(value = "name", required = true) val name: String,
+        @field:JsonProperty(value = "base_url", required = true) val baseUrl: String,
+        @field:JsonProperty(value = "api_key", required = true) val apiKey: String,
+        @field:JsonProperty(value = "client_type") val clientType: String = "openai",
+        @field:JsonProperty(value = "timeout") val timeout: Int = 60,
+        @field:JsonProperty(value = "default_max_retry") val defaultMaxRetry: Int = 3,
+        @field:JsonProperty(value = "default_temperature") val defaultTemperature: Double = 0.7,
+        @field:JsonProperty(value = "default_max_tokens") val defaultMaxTokens: Int = 4096,
+    )
 
-    public record Model(
-      @JsonProperty(value = "model_identifier", required = true) String modelIdentifier,
-      @JsonProperty(value = "name", required = true) String name,
-      @JsonProperty(value = "api_provider", required = true) String apiProvider,
-      @JsonProperty(value = "price_in") Double priceIn,
-      @JsonProperty(value = "price_out") Double priceOut,
-      @JsonProperty(value = "max_retry") Integer maxRetry,
-      @JsonProperty(value = "temperature") Double temperature,
-      @JsonProperty(value = "max_tokens") Integer maxTokens,
-      @JsonProperty(value = "force_stream_mode") Boolean forceStreamMode,
-      @JsonProperty(value = "enable_thinking") Boolean enableThinking
-    ) {
-    }
+    @JvmRecord
+    data class Model(
+        @field:JsonProperty(value = "model_identifier", required = true) val modelIdentifier: String,
+        @field:JsonProperty(value = "api_provider", required = true) val apiProvider: String,
+        @field:JsonProperty(value = "name") val name: String?,
+        @field:JsonProperty(value = "price_in") val priceIn: Double = 0.0,
+        @field:JsonProperty(value = "price_out") val priceOut: Double = 0.0,
+        @field:JsonProperty(value = "max_retry") val maxRetry: Int? = null,
+        @field:JsonProperty(value = "temperature") val temperature: Double? = null,
+        @field:JsonProperty(value = "max_tokens") val maxTokens: Int? = null,
+        @field:JsonProperty(value = "force_stream_mode") val forceStreamMode: Boolean = false,
+        @field:JsonProperty(value = "enable_thinking") val enableThinking: Boolean = false
+    )
 }

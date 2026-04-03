@@ -1,22 +1,17 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
 /**
  * Exception indicating that an error can be safely ignored.
  */
-public class IgnorableException extends RuntimeException {
-    public IgnorableException(String message) {
-        super(message);
-    }
+@Suppress("unused")
+open class IgnorableException : RuntimeException {
+    constructor(message: String) : super(message)
 
-    public IgnorableException(Throwable cause) {
-        super(cause);
-    }
+    constructor(cause: Throwable) : super(cause)
 
-    public IgnorableException(String format, Object... args) {
-        super(String.format(format, args));
-
-        if (args.length > 0 && args[args.length - 1] instanceof Throwable) {
-            this.initCause((Throwable) args[args.length - 1]);
+    constructor(format: String, vararg args: Any?) : super(String.format(format, *args)) {
+        if (args.isNotEmpty() && args[args.size - 1] is Throwable) {
+            this.initCause(args[args.size - 1] as Throwable?)
         }
     }
 }

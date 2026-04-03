@@ -4,6 +4,7 @@ import java.time.Instant
 plugins {
     id("java")
     id("maven-publish")
+    kotlin("jvm") version "2.3.20"
 }
 
 group = "org.maibot"
@@ -20,8 +21,6 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
 
     withSourcesJar()
 }
@@ -35,22 +34,22 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
 
     // Netty for networking
-    implementation("io.netty:netty-all:4.2.6.Final")
+    implementation("io.netty:netty-all:4.2.12.Final")
 
     // Jackson for JSON parsing
-    implementation("tools.jackson.core:jackson-databind:3.0.1")
+    implementation("tools.jackson.core:jackson-databind:3.1.0")
 
     // Hibernate for ORM
-    implementation("org.hibernate.orm:hibernate-core:7.1.3.Final")
+    implementation("org.hibernate.orm:hibernate-core:7.2.7.Final")
 
     // JCache for caching
     implementation("javax.cache:cache-api:1.1.1")
 
     // Jetbrains Annotations
     implementation("org.jetbrains:annotations:24.0.1")
-    
+
     // OpenAI API
-    implementation("com.openai:openai-java:4.13.0")
+    implementation("com.openai:openai-java:4.30.0")
 }
 
 // Create build-inf.properties
@@ -130,4 +129,7 @@ fun calcSrcHash(): String {
     }
 
     return digest.digest().joinToString("") { "%02x".format(it) }
+}
+kotlin {
+    jvmToolchain(21)
 }

@@ -1,73 +1,33 @@
-package org.maibot.sdk.storage.db.dao;
+package org.maibot.sdk.storage.db.dao
 
-import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.Instant;
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.UpdateTimestamp
+import java.time.Instant
 
 @Entity
-@Table(name = "bin_file", indexes = {
-  @Index(name = "idx_bin_file_hash_sha256", columnList = "hash_sha256")
-})
-public class BinFile {
+@Table(name = "bin_file", indexes = [Index(name = "idx_bin_file_hash_sha256", columnList = "hash_sha256")])
+class BinFile {
+    @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    var id: Long? = null
 
-    /// 文件的 SHA-256 哈希值，用于文件命名和数据校验
+    /** 文件的 SHA-256 哈希值，用于文件命名和数据校验 */
+    @JvmField
     @Column(name = "hash_sha256", length = 64, unique = true)
-    private String hash;
+    var hash: String? = null
 
-    /// 文件类型，例如 png、wav 等
+    /** 文件类型，例如 png、wav 等 */
+    @JvmField
     @Column(name = "file_type")
-    private String fileType;
+    var fileType: String? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
-    private Instant createdAt;
+    var createdAt: Instant? = null
 
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
-    private Instant updatedAt;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getHash() {
-        return hash;
-    }
-
-    public void setHash(String hash) {
-        this.hash = hash;
-    }
-
-    public String getFileType() {
-        return fileType;
-    }
-
-    public void setFileType(String fileType) {
-        this.fileType = fileType;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    var updatedAt: Instant? = null
 }

@@ -1,7 +1,3 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
-public class InstanceConstructException extends UnignorableException {
-    public InstanceConstructException(String message, Object... args) {
-        super(message, args);
-    }
-}
+class InstanceConstructException(message: String, vararg args: Any?) : UnignorableException(message, *args)

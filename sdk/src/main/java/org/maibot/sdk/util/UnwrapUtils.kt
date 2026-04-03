@@ -1,12 +1,13 @@
-package org.maibot.sdk.util;
+package org.maibot.sdk.util
 
-public class UnwrapUtils {
-    public static <T> T unwrap(Class<T> clazz, Object... objects) {
-        for (Object obj : objects) {
+object UnwrapUtils {
+    @JvmStatic
+    fun <T> unwrap(clazz: Class<T>, vararg objects: Any?): T {
+        for (obj in objects) {
             if (clazz.isInstance(obj)) {
-                return clazz.cast(obj);
+                return clazz.cast(obj)
             }
         }
-        throw new ClassCastException("Cannot unwarp to " + clazz.getName());
+        throw ClassCastException("Cannot unwarp to " + clazz.getName())
     }
 }

@@ -1,41 +1,36 @@
-package org.maibot.sdk.net;
+package org.maibot.sdk.net
 
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest
+import io.netty.handler.codec.http.FullHttpResponse
+import java.net.URI
+import java.net.URL
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicReference
 
-import java.net.URI;
-import java.net.URL;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
+object HttpClient {
+    private val PROVIDER = AtomicReference<HttpClientProvider?>()
 
-import static java.util.Objects.requireNonNull;
-
-public final class HttpClient {
-    private static final AtomicReference<HttpClientProvider> PROVIDER = new AtomicReference<>();
-
-    public static void registerProvider(HttpClientProvider provider) {
-        requireNonNull(provider);
-        if (!PROVIDER.compareAndSet(null, provider)) {
-            throw new IllegalStateException("HttpClientProvider has already been registered");
-        }
+    fun registerProvider(provider: HttpClientProvider) {
+        check(PROVIDER.compareAndSet(null, provider)) { "HttpClientProvider has already been registered" }
     }
 
-    public static CompletableFuture<FullHttpResponse> request(String url, FullHttpRequest request) {
-        requireNonNull(url);
-        requireNonNull(request);
-        HttpClientProvider provider = PROVIDER.get();
-        var future = new CompletableFuture<FullHttpResponse>();
+    @JvmStatic
+    @Suppress("unused")
+    fun request(url: String, request: FullHttpRequest): CompletableFuture<FullHttpResponse?> {
+        val provider = PROVIDER.get()
+        val future = CompletableFuture<FullHttpResponse?>()
+
         if (provider == null) {
-            future.completeExceptionally(new IllegalStateException("No HttpClientProvider registered"));
-            return future;
+            future.completeExceptionally(IllegalStateException("No HttpClientProvider registered"))
+            return future
         }
-        URL parsedUrl;
+        val parsedUrl: URL
         try {
-            parsedUrl = new URI(url).toURL();
-        } catch (Exception e) {
-            future.completeExceptionally(new IllegalArgumentException("Unable to parse URL: " + url, e));
-            return future;
+            parsedUrl = URI(url).toURL()
+        } catch (e: Exception) {
+            future.completeExceptionally(IllegalArgumentException("Unable to parse URL: $url", e))
+            return future
         }
-        return provider.request(parsedUrl, request);
+        return provider.request(parsedUrl, request)
     }
 }

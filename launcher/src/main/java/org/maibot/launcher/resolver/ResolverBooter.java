@@ -14,7 +14,6 @@ import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RepositoryPolicy;
 import org.eclipse.aether.resolution.ArtifactDescriptorPolicy;
-import org.eclipse.aether.resolution.ResolutionErrorPolicy;
 import org.eclipse.aether.supplier.RepositorySystemSupplier;
 import org.eclipse.aether.util.graph.transformer.ConfigurableVersionSelector;
 import org.eclipse.aether.util.graph.transformer.ConflictResolver;
@@ -22,6 +21,7 @@ import org.eclipse.aether.util.graph.transformer.PathConflictResolver;
 import org.eclipse.aether.util.graph.transformer.SimpleOptionalitySelector;
 import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,8 +102,7 @@ public class ResolverBooter {
           new SimpleOptionalitySelector(),
           new ConflictResolver.ScopeDeriver() {
               @Override
-              public void deriveScope(ConflictResolver.ScopeContext context)
-              throws RepositoryException {
+              public void deriveScope(ConflictResolver.ScopeContext context) {
                   context.setDerivedScope(getDerivedScope(context.getParentScope(), context.getChildScope()));
               }
 
@@ -118,7 +117,7 @@ public class ResolverBooter {
         );
 
         return system.createSessionBuilder()
-          .withLocalRepositories(new LocalRepository(localRepoPath))
+          .withLocalRepositories(new LocalRepository(Path.of(localRepoPath)))
           .setSystemProperties(System.getProperties())
           .setDependencyGraphTransformer(depGraphTransformer)
           .setCache(new DefaultRepositoryCache())

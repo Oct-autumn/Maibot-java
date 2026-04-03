@@ -1,52 +1,46 @@
-package org.maibot.core.config;
+package org.maibot.core.config
 
-import org.maibot.sdk.SdkVersion;
-import org.maibot.sdk.exceptions.FatalError;
-import org.maibot.sdk.ioc.Component;
-import org.semver4j.Semver;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Properties;
+import org.maibot.sdk.SdkVersion
+import org.maibot.sdk.exceptions.FatalError
+import org.maibot.sdk.ioc.Component
+import org.semver4j.Semver
+import java.io.IOException
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 @Component
-public class BuildInfo {
-    private final Semver  coreVersion;
-    private final Semver  sdkVersion;
-    private final Instant buildTime;
+class BuildInfo private constructor() {
+    private val buildTimeInstant: Instant
 
-    private BuildInfo() {
-        try (InputStream input = getClass().getResourceAsStream("/META-INF/build-inf.properties")) {
-            assert input != null;
+    val coreVersion: Semver
+    val sdkVersion: Semver
+    val buildTime: String
+        get() = run {
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"))
+            return formatter.format(this.buildTimeInstant)
+        }
 
-            Properties prop = new Properties();
-            prop.load(input);
+    init {
+        try {
+            BuildInfo::class.java.getResourceAsStream("/META-INF/build-inf.properties").use { input ->
+                checkNotNull(input)
+                val prop = Properties()
+                prop.load(input)
 
-            var versionStr = prop.getProperty("version", "0.0.0");
-            var sdkVersionStr = SdkVersion.get();
-            var buildTimeStr = prop.getProperty("buildTime", "0");
+                val versionStr = prop.getProperty("version", "0.0.0")
+                val sdkVersionStr = SdkVersion.get()
+                val buildTimeStr = prop.getProperty("buildTime", "0")
 
-            this.coreVersion = new Semver(versionStr);
-            this.sdkVersion = new Semver(sdkVersionStr);
-            this.buildTime = Instant.ofEpochSecond(Long.parseLong(buildTimeStr));
-        } catch (IOException e) {
-            throw new FatalError("An error occurred when loading build info.", e);
+                this.coreVersion = Semver(versionStr)
+                this.sdkVersion = Semver(sdkVersionStr)
+                this.buildTimeInstant = Instant.ofEpochSecond(buildTimeStr.toLong())
+            }
+        } catch (e: IOException) {
+            throw FatalError("An error occurred when loading build info.", e)
         }
     }
 
-    public Semver coreVersion() {
-        return this.coreVersion;
-    }
 
-    public String getBuildTime() {
-        var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"));
-        return formatter.format(this.buildTime);
-    }
-
-    public Semver sdkVersion() {
-        return this.sdkVersion;
-    }
 }

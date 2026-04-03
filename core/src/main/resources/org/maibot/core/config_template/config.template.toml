@@ -1,7 +1,90 @@
 version = "0.1.0"
 
+# Bot信息配置
+[bot_info]
+# Bot名称
+# 该名称将用于构建Bot的身份，Bot将以这个名称与用户进行交互
+name = ""
+# Bot别名列表（可选）
+# 这些别名也可以用于指代Bot，提供更多的称呼选择，使得Bot在与用户的交流中更加自然和多样化
+# aliases = []
+
 
 [log]
-path = "logs/logs"
-level = "info"
+# 是否启用MDC跟踪（Mapped Diagnostic Context，映射诊断上下文）
+# 该功能用于在日志中跟踪特定的上下文信息，如请求ID、用户ID等，对于调试和分析日志非常有帮助。
+# 启用后可以在日志输出中包含这些上下文信息，以便更好地理解日志事件的来源和关联。
+# 如果你不是开发者，建议保持默认值false以避免日志输出过于冗杂。
+# enable_mdc_track = true
 
+# 控制台日志配置
+[log.console]
+# 日志输出级别
+# 可选值包括："trace" < "debug" < "info"（默认） < "warn" < "error" < "off"
+# （从最详细到最简洁，off表示关闭日志输出）
+# level = "info"
+
+# 日志过滤规则
+# 格式 "包名:日志级别"，如 "org.hibernate:info"
+# 不填写日志级别则默认为"off"，表示关闭该包的日志
+# 如果你不清楚如何配置，建议保持默认
+filter_rule = [
+    "org.hibernate:warn",
+    "org.jboss:warn",
+    "com.mchange:warn",
+    "org.sqlite:warn",
+    "io.netty:warn",
+    "org.ehcache:warn",
+]
+
+# 文件日志配置
+[log.file]
+# 日志输出级别
+# 可选值包括："trace" < "debug" < "info"（默认） < "warn" < "error" < "off"
+# （从最详细到最简洁，off表示关闭日志输出）
+# level = "info"
+
+# 最大日志文件数量
+# 当日志文件达到指定数量后，最旧的文件将被删除以腾出空间
+# 默认为5
+# max_rolling_files = 5
+# 最大日志总大小（单位：MB）
+# 当日志文件总大小达到指定值后，最旧的文件将被删除以腾出空间
+# 默认为100MB
+# max_total_size_mb = 100
+
+# 日志过滤规则
+# 格式 "包名:日志级别"，如 "org.hibernate:info"
+# 不填写日志级别则默认为"off"，表示关闭该包的日志
+# 如果你不清楚如何配置，建议保持默认
+filter_rule = [
+    "org.hibernate:warn",
+    "org.jboss:warn",
+    "com.mchange:warn",
+    "org.sqlite:warn",
+    "io.netty:warn",
+    "org.ehcache:warn",
+]
+
+# 网络配置
+[network]
+# 服务端监听的IP地址
+# 如果你希望Bot只能在本地访问，使用127.0.0.1即可；
+host = "127.0.0.1"
+# 服务端监听的端口号
+# 你可以根据需要修改端口号，但请确保该端口未被其他应用占用，并且在防火墙中允许访问（如果需要远程访问的话）
+port = 8080
+# 验证Token（可选）
+# 由大小写字母、数字和特殊字符组成，建议使用长度较长且复杂的字符串，以防止被猜测或暴力破解。
+# 在Bot的API请求中，客户端需要在请求头中包含这个Token（Authorization: Bearer <token>）
+# 如果你将Bot部署在公共网络上，建议启用该项以增加安全性。
+# auth_token = "your_secure_token_here"
+
+# 思考配置
+[thinking]
+# 观察窗口大小
+# 该参数定义了Bot在进行思考时能够回顾的消息数。
+# 较大的观察窗口可以让Bot更好地理解上下文，但也会增加Token的消耗。
+# 你可以根据实际情况调整这个值，建议在20-50之间进行尝试，以找到最佳的性能和上下文理解平衡点。
+# 默认为30
+# observation_window_size = 30

@@ -43,7 +43,7 @@ bin/
 .DS_Store
 
 ### Build files ###
-src/main/resources/META-INF/build-inf.properties
+src/main/resources/org/maibot/launcher/build-inf.properties
 
 ### Run files ###
 run/

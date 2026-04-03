@@ -70,7 +70,7 @@ public class LauncherMain {
 
         try {
             var buildInfo = new BuildInfo();
-            System.out.printf("<=== MaiBot-JE Launcher - %s ===>\n", buildInfo.coreVersion().getVersion());
+            System.out.printf("<=== MaiBot-JE Launcher - %s ===>\n", buildInfo.launcherVersion().getVersion());
             System.out.printf("> Build Time: %s (UTC) <\n", buildInfo.getBuildTime());
         } catch (Exception e) {
             log.error("无法获取 Launcher 版本信息", e);

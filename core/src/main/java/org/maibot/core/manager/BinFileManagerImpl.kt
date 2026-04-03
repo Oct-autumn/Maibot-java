@@ -1,153 +1,131 @@
-package org.maibot.core.manager;
+package org.maibot.core.manager
 
-import jakarta.persistence.EntityManager;
-import org.maibot.sdk.ioc.Component;
-import org.maibot.sdk.manager.BinFileManager;
-import org.maibot.sdk.storage.db.dao.BinFile;
-import org.maibot.sdk.util.HashUtils;
-import org.maibot.sdk.util.LocalBinFileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import jakarta.persistence.EntityManager
+import org.maibot.sdk.ioc.Component
+import org.maibot.sdk.manager.BinFileManager
+import org.maibot.sdk.manager.BinFileManager.BinFileWithData
+import org.maibot.sdk.storage.db.dao.BinFile
+import org.maibot.sdk.util.HashUtils.getSha256Hash
+import org.maibot.sdk.util.LocalBinFileUtils.getFile
+import org.maibot.sdk.util.LocalBinFileUtils.saveFile
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 二进制文件管理器实现
  */
 @Component
-public class BinFileManagerImpl implements BinFileManager {
-    private static final Logger log = LoggerFactory.getLogger(BinFileManagerImpl.class);
-
+class BinFileManagerImpl : BinFileManager {
     // 锁对象映射，用于防止 交互实体 的重复创建
-    private final ConcurrentMap<String, CompletableFuture<BinFileWithData>> lockMap = new ConcurrentHashMap<>();
+    private val lockMap = ConcurrentHashMap<String, CompletableFuture<BinFileWithData>>()
 
-    @Override
-    public BinFileWithData getOrCreatIfAbsent(EntityManager em, String hash, String fileType, byte[] binData) {
+    override fun getOrCreatIfAbsent(
+        em: EntityManager, hash: String, fileType: String, binData: ByteArray
+    ): BinFileWithData? {
         // 使用锁对象，防止重复查询和创建
-        var lockObject = new CompletableFuture<BinFileWithData>();
-        var mappedLock = lockMap.putIfAbsent(hash, lockObject);
+        val lockObject = CompletableFuture<BinFileWithData>()
+        val mappedLock = lockMap.putIfAbsent(hash, lockObject)
 
         if (mappedLock == null) {
             // 当前线程获得锁，执行获取或创建逻辑
             try {
                 // 检查实体是否存在，防止重复创建
-                BinFileWithData binFileWithData;
+                val binFileWithData = (this.get(em, hash) ?: run { // 不存在则创建新实体
+                    saveFile(fileType, hash, binData)
 
-                binFileWithData = this.get(em, hash);
-                if (binFileWithData == null) {
-                    // 不存在则创建新实体
-                    LocalBinFileUtils.saveFile(fileType, hash, binData);
-
-                    var newBinFile = new BinFile();
-                    newBinFile.setHash(hash);
-                    newBinFile.setFileType(fileType);
-                    em.persist(newBinFile);
-
-                    binFileWithData = new BinFileWithData(newBinFile, binData);
-                } else if (binFileWithData.data() == null) {
-                    // 存在但本地文件缺失，补全本地文件
-                    LocalBinFileUtils.saveFile(fileType, hash, binData);
-                    binFileWithData = new BinFileWithData(binFileWithData.binFile(), binData);
+                    BinFile().run {
+                        this.hash = hash
+                        this.fileType = fileType
+                        em.persist(this)
+                        BinFileWithData(this, binData)
+                    }
+                }).run {
+                    if (data != null) {
+                        return@run this
+                    } else {
+                        // 存在但本地文件缺失，补全本地文件
+                        saveFile(fileType, hash, binData)
+                        return@run BinFileWithData(binFile, binData)
+                    }
                 }
+
                 // 完成锁对象，通知等待的线程
-                lockObject.complete(binFileWithData);
-                return binFileWithData;
-            } catch (Exception e) {
-                log.error("获取或创建 BinFile (hash: {}) 时发生异常", hash, e);
-                lockObject.completeExceptionally(e);
-                return null;
+                lockObject.complete(binFileWithData)
+                return binFileWithData
+            } catch (e: Exception) {
+                log.error("获取或创建 BinFile (hash: {}) 时发生异常", hash, e)
+                lockObject.completeExceptionally(e)
+                return null
             }
         } else {
             // 其他线程等待锁对象完成
             try {
-                return mappedLock.get();
-            } catch (Exception e) {
-                log.error("等待获取 BinFile (hash: {}) 时发生异常", hash, e);
-                return null;
+                return mappedLock.get()
+            } catch (e: Exception) {
+                log.error("等待获取 BinFile (hash: {}) 时发生异常", hash, e)
+                return null
             }
         }
     }
 
-    @Override
-    public BinFileWithData update(EntityManager em, BinFile binFile, byte[] binData) {
+    override fun update(em: EntityManager, binFile: BinFile, binData: ByteArray): BinFileWithData? {
         try {
-            try (var binStream = new ByteArrayInputStream(binData)) {
-                var hash = HashUtils.getSha256Hash(binStream);
-                LocalBinFileUtils.saveFile(binFile.getFileType(), hash, binData);
-
-                binFile.setHash(hash);
-                em.merge(binFile);
-
-                return new BinFileWithData(binFile, binData);
+            ByteArrayInputStream(binData).use { binStream ->
+                val hash = getSha256Hash(binStream)
+                saveFile(binFile.fileType!!, hash, binData)
+                binFile.hash = hash
+                em.merge(binFile)
+                return BinFileWithData(binFile, binData)
             }
-        } catch (Exception e) {
-            log.error("更新 BinFile (id: {}) 时发生异常", binFile.getId(), e);
-            return null;
+        } catch (e: Exception) {
+            log.error("更新 BinFile (id: {}) 时发生异常", binFile.id, e)
+            return null
         }
     }
 
-    @Override
-    public BinFileWithData get(EntityManager em, String hash) {
+    override fun get(em: EntityManager, hash: String): BinFileWithData? {
         try {
-            var query = em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile.class);
-            query.setParameter("hash", hash);
-
-            var resultList = query.getResultList();
-            if (resultList.isEmpty()) {
-                return null;
-            } else {
-                var binFile = resultList.getFirst();
-                return internalGet(binFile);
-            }
-        } catch (Exception e) {
-            log.error("获取 BinFile (hash: {}) 时发生异常", hash, e);
-            return null;
+            return em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile::class.java)
+                .apply { setParameter("hash", hash) }.resultList.firstOrNull()?.let { internalGet(it) }
+        } catch (e: Exception) {
+            log.error("获取 BinFile (hash: {}) 时发生异常", hash, e)
+            return null
         }
     }
 
-    @Override
-    public BinFileWithData get(EntityManager em, long id) {
+    override fun get(em: EntityManager, id: Long): BinFileWithData? {
         try {
-            var query = em.createQuery("SELECT b FROM BinFile b WHERE b.id = :id", BinFile.class);
-            query.setParameter("id", id);
-
-            var resultList = query.getResultList();
-            if (resultList.isEmpty()) {
-                return null;
-            } else {
-                var binFile = resultList.getFirst();
-                return internalGet(binFile);
-            }
-        } catch (Exception e) {
-            log.error("获取 BinFile (id: {}) 时发生异常", id, e);
-            return null;
+            return em.createQuery("SELECT b FROM BinFile b WHERE b.id = :id", BinFile::class.java)
+                .apply { setParameter("id", id) }.resultList.firstOrNull()?.let { internalGet(it) }
+        } catch (e: Exception) {
+            log.error("获取 BinFile (id: {}) 时发生异常", id, e)
+            return null
         }
     }
 
-    private BinFileManager.BinFileWithData internalGet(BinFile binFile) {
-        var file = LocalBinFileUtils.getFile(binFile.getFileType(), binFile.getHash());
-
-        if (file != null) {
-            try (var fileInputStream = new FileInputStream(file)) {
+    private fun internalGet(binFile: BinFile): BinFileWithData {
+        try {
+            getFile(binFile.fileType!!, binFile.hash!!)?.inputStream()?.use { fileInputStream ->
                 // 核对hash
-                var hash = HashUtils.getSha256Hash(fileInputStream);
-                if (hash.equals(binFile.getHash())) {
-                    var fileData = fileInputStream.readAllBytes();
-                    return new BinFileWithData(binFile, fileData);
+                val hash = getSha256Hash(fileInputStream)
+                if (hash == binFile.hash) {
+                    val fileData = fileInputStream.readAllBytes()
+                    return BinFileWithData(binFile, fileData)
                 } else {
-                    log.warn("本地文件 Hash 不匹配 (expected: {}, actual: {})，推测文件已损坏", binFile.getHash(), hash);
+                    log.warn("本地文件 Hash 不匹配 (expected: {}, actual: {})，推测文件已损坏", binFile.hash, hash)
                 }
-            } catch (IOException e) {
-                log.error("读取本地文件时发生异常 (type: {}, hash: {})", binFile.getFileType(), binFile.getHash(), e);
-            }
-        } else {
-            log.warn("本地文件不存在 (type: {}, hash: {})", binFile.getFileType(), binFile.getHash());
+            } ?: log.warn("本地文件不存在 (type: {}, hash: {})", binFile.fileType, binFile.hash)
+        } catch (e: IOException) {
+            log.error("读取本地文件时发生异常 (type: {}, hash: {})", binFile.fileType, binFile.hash, e)
         }
-        return new BinFileWithData(binFile, null);
+        return BinFileWithData(binFile, null)
+    }
+
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(BinFileManagerImpl::class.java)
     }
 }

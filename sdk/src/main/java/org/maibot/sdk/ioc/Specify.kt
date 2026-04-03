@@ -1,16 +1,9 @@
-package org.maibot.sdk.ioc;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+package org.maibot.sdk.ioc
 
 /**
  * 用于在构造方法参数上指定注入的实现类
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.PARAMETER)
-public @interface Specify {
-    String name();
-}
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class Specify(val name: String)
 

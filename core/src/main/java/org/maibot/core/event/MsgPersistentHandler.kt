@@ -1,5 +1,3 @@
-package org.maibot.core.event;
+package org.maibot.core.event
 
-public class MsgPersistentHandler extends EventHandler {
-
-}
+class MsgPersistentHandler : EventHandler()

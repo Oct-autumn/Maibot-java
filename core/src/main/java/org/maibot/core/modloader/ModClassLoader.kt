@@ -1,131 +1,118 @@
-package org.maibot.core.modloader;
+package org.maibot.core.modloader
 
-import lombok.NonNull;
-
-import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
+import java.io.IOException
+import java.net.URL
+import java.net.URLClassLoader
+import java.util.*
 
 /**
  * 用于加载模块的类加载器
- * <p>
- * 因为模块间也存在依赖关系，因此我们需要重新实现类加载器，以打破双亲委托模型。<br>
+ * 
+ * 
+ * 因为模块间也存在依赖关系，因此我们需要重新实现类加载器，以打破双亲委托模型。<br></br>
  * 模块类加载器允许多亲委托，即在加载类时，可以向多个父类加载器请求加载类。
- *
+ * 
  * @author OctAutumn
  */
-public class ModClassLoader extends URLClassLoader {
-    /// 是否为Root模块加载器
-    private final boolean isRoot;
+class ModClassLoader : URLClassLoader {
+    /** 是否为Root模块加载器 */
+    private val isRoot: Boolean
 
-    /// 父加载器列表
-    private ClassLoader[] parentCls;
+    /** 父加载器列表 */
+    private var parentCls: Array<ClassLoader>
 
-    public ModClassLoader(@NonNull URL modUrl, @NonNull List<ClassLoader> initialParent) {
-        super(new URL[]{modUrl}, null); // 不使用默认的父类加载器
-        this.isRoot = false;
-        this.parentCls = initialParent.toArray(new ClassLoader[0]);
+    constructor(modUrl: URL, initialParent: List<ClassLoader>) :
+            super(arrayOf(modUrl), null) // 不使用默认的父类加载器
+    {
+        this.isRoot = false
+        this.parentCls = initialParent.toTypedArray()
     }
 
-    public ModClassLoader(@NonNull List<ClassLoader> parents) {
-        super(new URL[]{}, null); // 不使用默认的父类加载器
-        if (parents.isEmpty()) {
-            throw new IllegalArgumentException("Root ModClassLoader requires at least one parent ClassLoader");
-        }
-        this.isRoot = true;
-        this.parentCls = parents.toArray(new ClassLoader[0]);
+    constructor(parents: List<ClassLoader>) :
+            super(arrayOf(), null) // 不使用默认的父类加载器
+    {
+        require(!parents.isEmpty()) { "Root ModClassLoader requires at least one parent ClassLoader" }
+        this.isRoot = true
+        this.parentCls = parents.toTypedArray()
     }
 
-    @Override
-    protected Class<?> loadClass(String name, boolean resolve)
-    throws ClassNotFoundException {
-        Class<?> cls = super.findLoadedClass(name);
+    @Throws(ClassNotFoundException::class)
+    override fun loadClass(name: String, resolve: Boolean): Class<*> {
+        var cls = super.findLoadedClass(name)
 
-        if (cls == null) {
+        cls ?: let {
             // 依次向父加载器请求加载类
-            for (ClassLoader parent : parentCls) {
+            for (parent in parentCls) {
                 try {
-                    cls = parent.loadClass(name);
-                    if (cls != null) {
-                        break;
-                    }
-                } catch (ClassNotFoundException ignored) {
+                    cls = parent.loadClass(name)
+                    break
+                } catch (_: ClassNotFoundException) {
                     // 忽略异常，继续尝试下一个父加载器
+                }
+            }
+            cls
+        } ?: let {
+            if (isRoot) {
+                // Root加载器无法加载类，直接抛出异常
+                throw ClassNotFoundException(name)
+            }
+            // 如果父加载器都无法加载，则尝试自己加载
+            cls = super.findClass(name)
+        }
+
+        if (resolve) {
+            super.resolveClass(cls)
+        }
+
+        return cls
+    }
+
+    override fun getResource(name: String): URL? {
+        var resource: URL? = null
+
+        // 依次向父加载器请求资源
+        for (parent in parentCls) {
+            resource = parent.getResource(name) ?: continue
+            break
+        }
+
+        return resource ?: let {
+            if (isRoot) {
+                // Root加载器无法加载资源，直接返回null
+                return@let null
+            }
+            // 如果父加载器都无法提供资源，则尝试自己加载
+            super.findResource(name)
+        }
+    }
+
+    @Throws(IOException::class)
+    override fun getResources(name: String): Enumeration<URL> {
+        // 这里不进行缓存，直接依次请求所有父加载器和自己
+        val resources = ArrayList<URL>()
+
+        for (parent in parentCls) {
+            with(parent.getResources(name)) {
+                while (hasMoreElements()) {
+                    resources.add(nextElement())
                 }
             }
         }
 
-        if (cls == null) {
-            if (isRoot) {
-                // Root加载器无法加载类，直接抛出异常
-                throw new ClassNotFoundException(name);
-            }
-            // 如果父加载器都无法加载，则尝试自己加载
-            cls = super.findClass(name);
-        }
-
-        if (resolve) {
-            super.resolveClass(cls);
-        }
-
-        return cls;
-    }
-
-    @Override
-    public URL getResource(String name) {
-        URL resource = null;
-
-        // 依次向父加载器请求资源
-        for (ClassLoader parent : parentCls) {
-            resource = parent.getResource(name);
-            if (resource != null) {
-
-            }
-        }
-
-        // 如果父加载器都无法提供资源，则尝试自己加载
-        if (resource == null) {
-            if (isRoot) {
-                // Root加载器无法加载资源，直接返回null
-                return null;
-            }
-            resource = super.findResource(name);
-        }
-
-        return resource;
-    }
-
-    @Override
-    public Enumeration<URL> getResources(String name)
-    throws IOException {
-        // 这里不进行缓存，直接依次请求所有父加载器和自己
-        var resources = new ArrayList<URL>();
-
-        for (ClassLoader parent : parentCls) {
-            var parentResources = parent.getResources(name);
-            while (parentResources.hasMoreElements()) {
-                resources.add(parentResources.nextElement());
-            }
-        }
-
         if (!isRoot) {
-            var ownResources = super.findResources(name);
-            while (ownResources.hasMoreElements()) {
-                resources.add(ownResources.nextElement());
+            with(super.findResources(name)) {
+                while (hasMoreElements()) {
+                    resources.add(nextElement())
+                }
             }
         }
 
-        return Collections.enumeration(resources);
+        return Collections.enumeration(resources)
     }
 
-    @Override
-    public void close()
-    throws IOException {
-        super.close();
-        this.parentCls = new ClassLoader[0];
+    @Throws(IOException::class)
+    override fun close() {
+        super.close()
+        this.parentCls = arrayOf()
     }
 }

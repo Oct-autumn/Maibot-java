@@ -5,6 +5,7 @@ import java.time.Instant
 plugins {
     id("java")
     id("com.gradleup.shadow") version "9.2.2"
+    kotlin("jvm") version "2.3.20"
 }
 
 group = "org.maibot"
@@ -21,7 +22,7 @@ dependencies {
 
     // SLF4J and Logback for logging
     implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("ch.qos.logback:logback-classic:1.5.19")
+    implementation("ch.qos.logback:logback-classic:1.5.32")
 
     // argparse4j for command-line argument parsing
     implementation("net.sourceforge.argparse4j:argparse4j:0.9.0")
@@ -29,14 +30,18 @@ dependencies {
     // Semver4j for semantic versioning
     implementation("org.semver4j:semver4j:6.0.0")
 
-    // Gson for JSON processing
-    implementation("com.google.code.gson:gson:2.13.2")
+    // Jackson for configuration
+    implementation("tools.jackson.core:jackson-databind:3.1.0")
 
     // Maven Resolver for running dependency download
-    implementation("org.apache.maven.resolver:maven-resolver-supplier-mvn4:2.0.13")
+    implementation("org.apache.maven.resolver:maven-resolver-supplier-mvn4:2.0.16")
 
     // JNA for native access
     implementation("com.github.jnr:jnr-posix:3.1.21")
+
+    // Kotlin standard library and reflection
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.20")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.20")
 }
 
 tasks.jar {
@@ -67,7 +72,7 @@ tasks.register("createBuildInfo") {
     val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
 
     doLast {
-        val outputDir = file("src/main/resources/META-INF")
+        val outputDir = file("src/main/resources/org/maibot/launcher")
         val outputFile = file("$outputDir/build-inf.properties")
 
         if (!outputDir.exists()) {
@@ -107,4 +112,7 @@ fun calcSrcHash(): String {
     }
 
     return digest.digest().joinToString("") { "%02x".format(it) }
+}
+kotlin {
+    jvmToolchain(21)
 }

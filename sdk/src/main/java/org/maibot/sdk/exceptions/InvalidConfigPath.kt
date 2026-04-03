@@ -1,7 +1,3 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
-public class InvalidConfigPath extends UnignorableException {
-    public InvalidConfigPath(String message, Object... args) {
-        super(message, args);
-    }
-}
+class InvalidConfigPath(message: String, vararg args: Any?) : UnignorableException(message, *args)

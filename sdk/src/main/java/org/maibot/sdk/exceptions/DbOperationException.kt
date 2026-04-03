@@ -1,7 +1,3 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
-public class DbOperationException extends IgnorableException {
-    public DbOperationException(String message, Object... args) {
-        super(message, args);
-    }
-}
+class DbOperationException(message: String, vararg args: Any?) : IgnorableException(message, *args)

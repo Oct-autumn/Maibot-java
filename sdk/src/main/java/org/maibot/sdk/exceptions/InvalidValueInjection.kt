@@ -1,7 +1,3 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
-public class InvalidValueInjection extends UnignorableException {
-    public InvalidValueInjection(String message, Object... args) {
-        super(message, args);
-    }
-}
+class InvalidValueInjection(message: String, vararg args: Any?) : UnignorableException(message, *args)

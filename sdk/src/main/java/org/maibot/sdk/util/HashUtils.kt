@@ -1,39 +1,44 @@
-package org.maibot.sdk.util;
+package org.maibot.sdk.util
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 
-public class HashUtils {
-    public static String getSha256Hash(InputStream inputStream) {
+object HashUtils {
+    @JvmStatic
+    fun getSha256Hash(inputStream: InputStream): String {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                digest.update(buffer, 0, bytesRead);
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while ((inputStream.read(buffer).also { bytesRead = it }) != -1) {
+                digest.update(buffer, 0, bytesRead)
             }
-            byte[] hashBytes = digest.digest();
+            val hashBytes = digest.digest()
 
             // 将字节数组转换为十六进制字符串
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hashBytes) {
-                sb.append(String.format("%02x", b));
+            val sb = StringBuilder()
+            for (b in hashBytes) {
+                sb.append(String.format("%02x", b))
             }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
-        } catch (IOException e) {
-            throw new RuntimeException("Error reading input stream", e);
+            return sb.toString()
+        } catch (e: NoSuchAlgorithmException) {
+            throw RuntimeException("SHA-256 algorithm not found", e)
+        } catch (e: IOException) {
+            throw RuntimeException("Error reading input stream", e)
         }
     }
 
-    public static String getSha256Hash(byte[] data) {
-        try (InputStream inputStream = new java.io.ByteArrayInputStream(data)) {
-            return getSha256Hash(inputStream);
-        } catch (IOException e) {
-            throw new RuntimeException("Error reading byte array", e);
+    @JvmStatic
+    fun getSha256Hash(data: ByteArray): String {
+        try {
+            ByteArrayInputStream(data).use { inputStream ->
+                return getSha256Hash(inputStream)
+            }
+        } catch (e: IOException) {
+            throw RuntimeException("Error reading byte array", e)
         }
     }
 }

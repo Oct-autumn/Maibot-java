@@ -1,16 +1,17 @@
-package org.maibot.sdk.util;
+package org.maibot.sdk.util
 
-public class StrUtils {
-    public static String strAbbreviate(String str, int maxLength, int threshold) {
-        if (str.length() <= maxLength) {
-            return str;
+object StrUtils {
+    @JvmStatic
+    fun strAbbreviate(str: String, maxLength: Int, threshold: Int): String {
+        return if (str.length <= maxLength) {
+            str
         } else {
-            return String.format(
-              "%s...%s(len=%d)",
-              str.substring(0, threshold),
-              str.substring(str.length() - threshold),
-              str.length()
-            );
+            String.format(
+                "%s...%s(len=%d)",
+                str.substring(0, threshold),
+                str.substring(str.length - threshold),
+                str.length
+            )
         }
     }
 }

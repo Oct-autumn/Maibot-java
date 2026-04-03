@@ -1,11 +1,10 @@
-package org.maibot.sdk.ioc;
+package org.maibot.sdk.ioc
 
 /**
  * IOC 容器接口，提供获取实例的方法
  */
-public interface IOC {
+interface IOC {
+    fun <T> get(interfaceOrClass: Class<T>, name: String): T
 
-    <T> T get(Class<T> interfaceOrClass, String name);
-
-    <T> T get(Class<T> interfaceOrClass);
+    fun <T> get(interfaceOrClass: Class<T>): T
 }

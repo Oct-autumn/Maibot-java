@@ -1,66 +1,29 @@
-package org.maibot.sdk.storage.db.dao;
+package org.maibot.sdk.storage.db.dao
 
-import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.util.List;
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.UpdateTimestamp
 
 @Entity
 @Table(name = "person")
-public class Person {
+class Person {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    var id: Long? = null
 
-    /// 名称
+    /** 名称 */
+    @JvmField
     @Column(name = "name", nullable = false)
-    private String name;
+    var name: String? = null
 
-    @OneToMany(mappedBy = "person", cascade = CascadeType.ALL)
-    private List<InteractionEntity> interactionEntities;
+    @OneToMany(mappedBy = "person", cascade = [CascadeType.ALL])
+    val interactionEntities: MutableList<InteractionEntity?>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
-    private String createdAt;
+    var createdAt: String? = null
 
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
-    private String updatedAt;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public List<InteractionEntity> getInteractionEntities() {
-        return interactionEntities;
-    }
-
-    public String getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(String createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(String updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    var updatedAt: String? = null
 }

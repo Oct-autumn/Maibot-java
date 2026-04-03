@@ -1,21 +1,23 @@
-package org.maibot.sdk.storage.db;
+package org.maibot.sdk.storage.db
 
-import jakarta.persistence.EntityManager;
-import org.maibot.sdk.exceptions.DbOperationException;
+import jakarta.persistence.EntityManager
+import org.maibot.sdk.exceptions.DbOperationException
+import java.util.concurrent.CompletableFuture
+import java.util.function.Consumer
 
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-import java.util.function.Function;
+@Suppress("unused")
+interface DatabaseService {
+    @Throws(DbOperationException::class)
+    fun <T> exec(func: (em: EntityManager) -> T): T
 
+    fun <T> execAsync(func: (em: EntityManager) -> T): CompletableFuture<T>
 
-public interface DatabaseService {
-    <T> T exec(Function<EntityManager, T> func)
-    throws DbOperationException;
+    @Throws(DbOperationException::class)
+    fun <T> exec(func: Consumer<EntityManager>) {
+        return exec { func.accept(it) }
+    }
 
-    <T> CompletableFuture<T> execAsync(Function<EntityManager, T> func);
-
-    CompletableFuture<Object> execAsync(Consumer<EntityManager> func);
-
-    void exec(Consumer<EntityManager> func)
-    throws DbOperationException;
+    fun <T> execAsync(func: Consumer<EntityManager>): CompletableFuture<Unit> {
+        return execAsync { func.accept(it) }
+    }
 }

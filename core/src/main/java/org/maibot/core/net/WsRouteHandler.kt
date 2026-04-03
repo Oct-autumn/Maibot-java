@@ -1,93 +1,84 @@
-package org.maibot.core.net;
+package org.maibot.core.net
 
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import org.maibot.core.ioc.Instance;
-import org.maibot.sdk.ioc.AutoInject;
-import org.maibot.sdk.ioc.Component;
-import org.maibot.sdk.net.WsProcessors;
-import org.maibot.sdk.net.WsRouter;
-import org.slf4j.Logger;
-
-import java.util.HashMap;
-import java.util.Map;
+import io.netty.channel.ChannelFutureListener
+import io.netty.channel.ChannelHandler
+import io.netty.channel.ChannelHandlerContext
+import io.netty.handler.codec.http.DefaultHttpResponse
+import io.netty.handler.codec.http.FullHttpRequest
+import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.QueryStringDecoder
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler
+import org.maibot.core.ioc.Instance
+import org.maibot.sdk.ioc.AutoInject
+import org.maibot.sdk.ioc.Component
+import org.maibot.sdk.net.WsProcessors
+import org.maibot.sdk.net.WsRouter
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 @Component
 @ChannelHandler.Sharable
-public class WsRouteHandler extends WsRouter {
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(WsRouteHandler.class);
+class WsRouteHandler
+@AutoInject private constructor(
+    private val activeWsManager: ActiveWsManager
+) : WsRouter() {
+    private val processors = HashMap<String, WsProcessors>()
 
-    private final ActiveWsManager activeWsManager;
+    override fun registerProcessor(wsProcessors: WsProcessors) {
+        val path = wsProcessors.path
 
-    private final Map<String, WsProcessors> processors = new HashMap<>();
-
-    @AutoInject
-    public WsRouteHandler(ActiveWsManager activeWsManager) {
-        super();
-        this.activeWsManager = activeWsManager;
-    }
-
-    @Override
-    public void registerProcessor(WsProcessors processor) {
-        var path = processor.getPath();
-        if (processors.containsKey(path)) {
-            log.warn("已有WS处理器注册，覆盖旧的处理器: PATH: {}", path);
+        processors[path]?.let {
+            log.warn("已有WS处理器注册，覆盖旧的处理器: PATH: {}", path)
         }
-        processors.put(path, processor);
-        log.debug("注册WS处理器: PATH: {}", path);
+
+        processors[path] = wsProcessors
+        log.debug("注册WS处理器: PATH: {}", path)
     }
 
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
-        var parser = new QueryStringDecoder(req.uri());
-        var path = parser.path();
-        if (processors.containsKey(path)) {
-            log.trace("找到 PATH: {} 的WS处理器，开始处理", path);
+    override fun channelRead0(ctx: ChannelHandlerContext, req: FullHttpRequest) {
+        val parser = QueryStringDecoder(req.uri())
+        val path = parser.path()
 
-            activeWsManager.addConnection(path, ctx);
+        processors[path]?.let { handlerList ->
+            log.trace("收到WS请求: PATH: {}", path)
 
-            var pipeline = ctx.pipeline();
+            activeWsManager.addConnection(path, ctx)
 
-            {// 添加WebSocket协议处理器
-                ChannelHandler handler = new WebSocketServerProtocolHandler(path);
-                String uniqueHandlerName = String.format(
-                  "%s@%s",
-                  handler.getClass().getSimpleName(),
-                  System.identityHashCode(handler)
-                );
-                pipeline.addBefore("exceptionHandler", uniqueHandlerName, handler);
-            }
+            ctx.pipeline().apply {
+                // 添加WebSocket协议处理器
+                val handler: ChannelHandler = WebSocketServerProtocolHandler(path)
+                val uniqueHandlerName = "${handler.javaClass.getSimpleName()}@${System.identityHashCode(handler)}"
+                addBefore("exceptionHandler", uniqueHandlerName, handler)
 
-            for (var handler : processors.get(path).getHandlers()) {
-                ChannelHandler handlerInst;
-                try {
-                    handlerInst = (ChannelHandler) Instance.get(handler);
-                } catch (Exception e) {
-                    log.error("无法实例化WS处理器: PATH: {}, Handler: {}", path, handler.getSimpleName(), e);
-                    continue;
+                // 添加用户自定义的处理器
+                handlerList.handlers.forEach { handler ->
+                    val handlerInst: ChannelHandler
+                    try {
+                        handlerInst = Instance.get(handler) as ChannelHandler
+                    } catch (e: Exception) {
+                        log.error("无法实例化WS处理器: PATH: {}, Handler: {}", path, handler.getSimpleName(), e)
+                        return@forEach
+                    }
+
+                    addBefore(
+                        "exceptionHandler",
+                        "${handler.getSimpleName()}@${System.identityHashCode(handlerInst)}",
+                        handlerInst
+                    )
                 }
-                String uniqueHandlerName = String.format(
-                  "%s@%s",
-                  handler.getSimpleName(),
-                  System.identityHashCode(handlerInst)
-                );
-                ctx.pipeline().addBefore("exceptionHandler", uniqueHandlerName, handlerInst);
+
+                ctx.fireChannelRead(req.retain()) // 此处使用retain()方法增加引用计数，确保请求对象在后续处理器中仍然有效
+
+                remove(this@WsRouteHandler) // 移除调度处理器，避免重复处理
             }
-
-            ctx.fireChannelRead(req.retain());
-
-            ctx.pipeline().remove(this); // 移除调度处理器，避免重复处理
-        } else {
-            log.warn("未找到 PATH: {} 的WS处理器，返回404", path);
-            var resp = new DefaultHttpResponse(req.protocolVersion(), HttpResponseStatus.NOT_FOUND);
-
-            ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
+        } ?: run {
+            log.warn("收到WS请求: PATH: {}，但未找到对应的处理器，返回404", path)
+            ctx.writeAndFlush(DefaultHttpResponse(req.protocolVersion(), HttpResponseStatus.NOT_FOUND))
+                .addListener(ChannelFutureListener.CLOSE)
         }
+    }
+
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(WsRouteHandler::class.java)
     }
 }

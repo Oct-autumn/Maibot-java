@@ -1,15 +1,16 @@
-package org.maibot.sdk.model;
+package org.maibot.sdk.model
 
-import com.openai.models.responses.Response;
+import com.openai.models.responses.Response
 
-public record APIResponse(
-  Response response,
-  TokenStatistics tokenStatistics
+@JvmRecord
+data class APIResponse(
+    val response: Response,
+    val tokenStatistics: TokenStatistics
 ) {
-    public record TokenStatistics(
-      long inputTokens,
-      long outputTokens,
-      long totalTokens
-    ) {
-    }
+    @JvmRecord
+    data class TokenStatistics(
+        val inputTokens: Long,
+        val outputTokens: Long,
+        val totalTokens: Long
+    )
 }

@@ -1,114 +1,53 @@
-package org.maibot.sdk.storage.db.dao;
+package org.maibot.sdk.storage.db.dao
 
-import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.Instant;
-import java.util.List;
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.UpdateTimestamp
+import java.time.Instant
 
 @Entity
 @Table(
-  name = "interaction_entity",
-  uniqueConstraints = {@UniqueConstraint(columnNames = {"platform", "platform_user_id"})},
-  indexes = {@Index(name = "idx_platform_user", columnList = "platform, platform_user_id")}
+    name = "interaction_entity",
+    uniqueConstraints = [UniqueConstraint(columnNames = ["platform", "platform_user_id"])],
+    indexes = [Index(name = "idx_platform_user", columnList = "platform, platform_user_id")]
 )
-public class InteractionEntity {
+class InteractionEntity {
+    @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    var id: Long? = null
 
-    /// 平台名称
+    /** 平台名称 */
+    @JvmField
     @Column(name = "platform", nullable = false)
-    private String platform;
+    var platform: String? = null
 
-    /// 平台用户ID
+    /** 平台用户ID */
+    @JvmField
     @Column(name = "platform_user_id", nullable = false)
-    private String platformUserId;
+    var platformUserId: String? = null
 
-    /// 昵称
+    /** 昵称 */
+    @JvmField
     @Column(name = "nickname", nullable = false)
-    private String nickname;
+    var nickname: String? = null
 
+    @JvmField
     @ManyToOne
     @JoinColumn(name = "person_id", referencedColumnName = "id", nullable = false)
-    private Person person;
+    var person: Person? = null
 
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL)
-    private List<Message> messages;
+    @OneToMany(mappedBy = "sender", cascade = [CascadeType.ALL])
+    val messages: MutableList<Message?>? = null
 
-    @OneToMany(mappedBy = "entity", cascade = CascadeType.ALL)
-    private List<GroupMember> groupMembers;
+    @OneToMany(mappedBy = "entity", cascade = [CascadeType.ALL])
+    val groupMembers: MutableList<GroupMember?>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
-    private Instant createdAt;
+    var createdAt: Instant? = null
 
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
-    private Instant updatedAt;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPlatform() {
-        return platform;
-    }
-
-    public void setPlatform(String platform) {
-        this.platform = platform;
-    }
-
-    public String getPlatformUserId() {
-        return platformUserId;
-    }
-
-    public void setPlatformUserId(String platformUserId) {
-        this.platformUserId = platformUserId;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public Person getPerson() {
-        return person;
-    }
-
-    public void setPerson(Person person) {
-        this.person = person;
-    }
-
-    public List<Message> getMessages() {
-        return messages;
-    }
-
-    public List<GroupMember> getGroupMembers() {
-        return groupMembers;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    var updatedAt: Instant? = null
 }

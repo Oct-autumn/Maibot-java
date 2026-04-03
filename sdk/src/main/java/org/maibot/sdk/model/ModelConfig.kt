@@ -1,8 +1,8 @@
-package org.maibot.sdk.model;
+package org.maibot.sdk.model
 
 /**
  * 模型配置类，包含模型标识、API提供商、价格信息和调用参数等
- *
+ * 
  * @param name            模型名称，需与配置文件中定义的模型名称一致
  * @param modelIdentifier 模型标识，需与配置文件中定义的模型标识一致
  * @param apiProvider     API提供商名称，需与配置文件中定义的API提供商名称一致
@@ -14,16 +14,16 @@ package org.maibot.sdk.model;
  * @param forceStreamMode 强制使用流式响应模式，适用于需要实时处理模型输出的任务，如对话生成、长文本生成等
  * @param enableThinking  启用思考（如果模型支持开关），可以让模型在生成过程中进行内部思考，提升生成质量和准确性
  */
-public record ModelConfig(
-  String name,
-  String modelIdentifier,
-  String apiProvider,
-  Double priceIn,
-  Double priceOut,
-  Integer maxRetry,
-  Double temperature,
-  Integer maxTokens,
-  Boolean forceStreamMode,
-  Boolean enableThinking
-) {
-}
+@JvmRecord
+data class ModelConfig(
+    @JvmField val name: String,
+    @JvmField val modelIdentifier: String,
+    @JvmField val apiProvider: String,
+    @JvmField val priceIn: Double,
+    @JvmField val priceOut: Double,
+    @JvmField val maxRetry: Int,
+    @JvmField val temperature: Double,
+    @JvmField val maxTokens: Int,
+    @JvmField val forceStreamMode: Boolean,
+    @JvmField val enableThinking: Boolean
+)

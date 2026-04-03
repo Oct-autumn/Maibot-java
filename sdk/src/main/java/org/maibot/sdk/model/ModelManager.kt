@@ -1,10 +1,15 @@
-package org.maibot.sdk.model;
+package org.maibot.sdk.model
 
-import org.maibot.sdk.config.TaskModelConfig;
+abstract class ModelManager {
+    protected abstract fun registerRequestTask(taskName: String, choosableModels: List<ChoosableModel>)
 
-public interface ModelManager {
+    protected abstract fun getRequestHandler(taskName: String): ModelRequestHandler?
 
-    void registerRequestTask(TaskModelConfig taskConfig);
+    operator fun get(taskName: String): ModelRequestHandler? {
+        return getRequestHandler(taskName)
+    }
 
-    ModelRequestHandler getRequestHandler(String taskName);
+    operator fun set(taskName: String, choosableModels: List<ChoosableModel>) {
+        registerRequestTask(taskName, choosableModels)
+    }
 }

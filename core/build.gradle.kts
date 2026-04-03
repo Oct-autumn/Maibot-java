@@ -3,6 +3,7 @@ import java.time.Instant
 
 plugins {
     id("java")
+    kotlin("jvm") version "2.3.20"
 }
 
 group = "org.maibot"
@@ -18,20 +19,6 @@ repositories {
     mavenCentral()
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-
-    // Exclude src/main/java/org/maibot/core/cache/mcache from compiling
-    sourceSets {
-        main {
-            java {
-                exclude("org/maibot/core/cache/mcache/**")
-            }
-        }
-    }
-}
-
 dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -39,50 +26,59 @@ dependencies {
 
     // SLF4J and Logback for logging
     implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("ch.qos.logback:logback-classic:1.5.19")
+    implementation("ch.qos.logback:logback-classic:1.5.32")
 
     // Jackson for configuration
-    implementation("tools.jackson.core:jackson-databind:3.0.1")
-    implementation("tools.jackson.dataformat:jackson-dataformat-toml:3.0.1")
-    implementation("tools.jackson.dataformat:jackson-dataformat-yaml:3.0.1")
-    implementation("tools.jackson.dataformat:jackson-dataformat-properties:3.0.1")
+    implementation("tools.jackson.core:jackson-databind:3.1.0")
+    implementation("tools.jackson.dataformat:jackson-dataformat-toml:3.1.0")
+    implementation("tools.jackson.dataformat:jackson-dataformat-yaml:3.1.0")
+    implementation("tools.jackson.dataformat:jackson-dataformat-properties:3.1.0")
+    implementation("tools.jackson.module:jackson-module-kotlin:3.1.0")
 
     // Lombok for reducing boilerplate code
-    compileOnly("org.projectlombok:lombok:1.18.42")
-    annotationProcessor("org.projectlombok:lombok:1.18.42")
+    compileOnly("org.projectlombok:lombok:1.18.44")
+    annotationProcessor("org.projectlombok:lombok:1.18.44")
 
     // ClassGraph for runtime classpath scanning
     implementation("io.github.classgraph:classgraph:4.8.184")
 
     // SQLite and Hibernate for database access
-    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
-    implementation("org.hibernate.orm:hibernate-core:7.1.3.Final")
-    implementation("org.hibernate.orm:hibernate-c3p0:7.1.3.Final")
-    implementation("org.hibernate.orm:hibernate-community-dialects:7.1.3.Final")
+    implementation("org.xerial:sqlite-jdbc:3.51.2.0")
+    implementation("org.hibernate.orm:hibernate-core:7.2.7.Final")
+    implementation("org.hibernate.orm:hibernate-c3p0:7.2.7.Final")
+    implementation("org.hibernate.orm:hibernate-community-dialects:7.2.7.Final")
 
     // Flyway for database migrations
-    implementation("org.flywaydb:flyway-core:11.17.1")
+    implementation("org.flywaydb:flyway-core:12.1.0")
 
     // javax xml bind (for Ehcache xml configuration)
-    implementation("javax.xml.bind:jaxb-api:2.3.1")
+    // Note: Before ehcache modifyed their xml configuration to be compatible with Jakarta XML Bind,
+    // we need to use the older javax.xml.bind:jaxb-api and org.glassfish.jaxb:jaxb-runtime
     implementation("org.glassfish.jaxb:jaxb-runtime:2.3.9")
+    implementation("javax.xml.bind:jaxb-api:2.3.1")
+    // For hibernate, we need to use the newer jakarta.xml.bind:jakarta.xml.bind-api, otherwise it will cause class loading issues
+    implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.5")
 
     // EhCache for caching
     implementation("org.ehcache:ehcache:3.11.1")
-    implementation("org.hibernate.orm:hibernate-jcache:7.1.7.Final")
+    implementation("org.hibernate.orm:hibernate-jcache:7.2.7.Final")
 
     // Semver4j for semantic versioning
     implementation("org.semver4j:semver4j:6.0.0")
 
     // Netty for networking
-    implementation("io.netty:netty-all:4.2.6.Final")
+    implementation("io.netty:netty-all:4.2.12.Final")
 
     // Command-line interface
     implementation("info.picocli:picocli-shell-jline3:4.7.7")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
+    // Kotlin standard library and reflection support
+    runtimeOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.20")
+    runtimeOnly("org.jetbrains.kotlin:kotlin-reflect:2.3.20")
+
     // OpenAI API
-    implementation("com.openai:openai-java:4.13.0")
+    implementation("com.openai:openai-java:4.30.0")
 
     // SDK Dependency
     implementation(project(":sdk"))
@@ -94,22 +90,26 @@ tasks.test {
 
 // Create build-inf.properties
 tasks.register("createBuildInfo") {
-    // Collect dependencies to include in build info (only implementation dependencies)
+    // Collect dependencies to include in build info (implementation, runtimeOnly)
     // These info are needed by the Launcher to download correct dependencies
-    val implDeps1 = configurations.findByName("implementation")
-        ?.allDependencies?.joinToString(",") { dep ->
-            when (dep) {
-                is ProjectDependency ->
-                    "project:${dep.path}"
 
-                else -> {
-                    val g = dep.group ?: ""
-                    val n = dep.name
-                    val v = dep.version ?: ""
-                    listOf(g, n, v).filter { it.isNotEmpty() }.joinToString(":")
-                }
+    val deps = HashSet<Dependency>().apply {
+        setOf("implementation", "runtimeOnly").forEach { depType ->
+            configurations.findByName(depType)?.allDependencies?.let { addAll(it) }
+        }
+    }.joinToString(",") { dep ->
+        when (dep) {
+            is ProjectDependency ->
+                "project:${dep.path}"
+
+            else -> {
+                val g = dep.group ?: ""
+                val n = dep.name
+                val v = dep.version ?: ""
+                listOf(g, n, v).filter { it.isNotEmpty() }.joinToString(":")
             }
-        } ?: ""
+        }
+    }
 
     val innerVersion = "$version+${calcSrcHash().substring(0, 8)}"
 
@@ -125,7 +125,7 @@ tasks.register("createBuildInfo") {
             version=$innerVersion
             artifactId=${this.project.group}:${this.project.name}:${this.project.version}
             buildTime=${Instant.now().epochSecond}
-            implDeps=$implDeps1
+            implDeps=$deps
         """.trimIndent()
         )
     }
@@ -171,4 +171,7 @@ fun calcSrcHash(): String {
     }
 
     return digest.digest().joinToString("") { "%02x".format(it) }
+}
+kotlin {
+    jvmToolchain(21)
 }

@@ -1,54 +1,48 @@
-package org.maibot.core.util;
+package org.maibot.core.util
 
-import java.util.HashMap;
-import java.util.Map;
-
-public class PrefixTreeMap<T, V> {
-    private final PrefixTreeMapNode<T, V> root = new PrefixTreeMapNode<>();
+class PrefixTreeMap<T, V> {
+    private val root = PrefixTreeMapNode<T, V>()
 
     /**
      * 插入一个键值对
-     *
+     * 
      * @param key   可迭代的键
      * @param value 值
      */
-    public void insert(Iterable<T> key, V value) {
-        var node = root;
-        for (var k : key) {
-            if (node.children == null) {
-                node.children = new HashMap<>();
-            }
-            node = node.children.computeIfAbsent(k, x -> new PrefixTreeMapNode<>());
+    fun insert(key: Iterable<T>, value: V) {
+        var node = root
+
+        // 遍历键的每个元素，构建前缀树
+        for (k in key) {
+            node.children = node.children ?: HashMap()
+            node = node.children!!.computeIfAbsent(k) { PrefixTreeMapNode() }
         }
-        node.isEnd = true;
-        node.value = value;
+
+        node.isEnd = true
+        node.value = value
     }
 
     /**
      * 搜索一个键
      * （返回最近一个最长前缀匹配的值）
-     *
+     * 
      * @param key 可迭代的键
      * @return 值，如果不存在则返回null
      */
-    public V search(Iterable<T> key) {
-        PrefixTreeMapNode<T, V> node = root;
-        V lastValue = null;
-        for (var k : key) {
-            if (node.children == null || !node.children.containsKey(k)) {
-                break;
-            }
-            node = node.children.get(k);
-            if (node.isEnd) {
-                lastValue = node.value;
-            }
+    fun search(key: Iterable<T>): V? {
+        var node = root
+        var lastValue: V? = null
+        for (k in key) {
+            node = node.children?.get(k) ?: break
+            if (node.isEnd) lastValue = node.value
         }
-        return lastValue;
+
+        return lastValue
     }
 
-    static class PrefixTreeMapNode<T, V> {
-        private Map<T, PrefixTreeMapNode<T, V>> children = null;
-        private boolean                         isEnd    = false;
-        private V                               value    = null;
+    internal class PrefixTreeMapNode<T, V> {
+        internal var children: MutableMap<T, PrefixTreeMapNode<T, V>>? = null
+        internal var isEnd = false
+        internal var value: V? = null
     }
 }

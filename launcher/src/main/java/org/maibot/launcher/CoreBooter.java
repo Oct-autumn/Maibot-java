@@ -1,12 +1,12 @@
 package org.maibot.launcher;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
+import java.util.HashMap;
 import java.util.List;
 
 public class CoreBooter {
@@ -42,11 +42,12 @@ public class CoreBooter {
     }
 
     public static String createCoreLaunchArgs(List<String> modList) {
-        var gson = new Gson();
-        var rootNode = new JsonObject();
+        var objMapper = new ObjectMapper();
 
-        rootNode.add("mod_list", gson.toJsonTree(modList));
+        var rootNodeMap = new HashMap<String, Object>();
 
-        return gson.toJson(rootNode);
+        rootNodeMap.put("mod_list", modList);
+
+        return objMapper.writeValueAsString(rootNodeMap);
     }
 }

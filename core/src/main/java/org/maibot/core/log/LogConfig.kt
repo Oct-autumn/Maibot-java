@@ -1,142 +1,142 @@
-package org.maibot.core.log;
+package org.maibot.core.log
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.FileAppender;
-import ch.qos.logback.core.rolling.RollingFileAppender;
-import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
-import ch.qos.logback.core.util.FileSize;
-import org.jline.reader.LineReader;
-import org.maibot.core.config.CoreConfig;
-import org.maibot.core.ioc.Instance;
-import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.FileAppender
+import ch.qos.logback.core.rolling.RollingFileAppender
+import ch.qos.logback.core.rolling.TimeBasedRollingPolicy
+import ch.qos.logback.core.util.FileSize
+import org.jline.reader.LineReader
+import org.maibot.core.config.CoreConfig
+import org.maibot.core.config.CoreConfig.Log.ConsoleLogSettings
+import org.maibot.core.config.CoreConfig.Log.FileLogSettings
+import org.maibot.core.ioc.Instance
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.util.*
 
-import java.io.File;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-
-public class LogConfig {
+object LogConfig {
     /*-!- 不要在此类中使用Logger -!-*/
+    private val AVAL_LEVELS = HashSet(
+        listOf(
+            "TRACE",
+            "DEBUG",
+            "INFO",
+            "WARN",
+            "ERROR",
+            "OFF"
+        )
+    )
 
-    private static final Set<String> AVAL_LEVELS = new HashSet<>(Arrays.asList(
-      "TRACE",
-      "DEBUG",
-      "INFO",
-      "WARN",
-      "ERROR",
-      "OFF"
-    ));
+    @JvmStatic
+    fun configure(conf: CoreConfig.Log) {
+        (LoggerFactory.getILoggerFactory() as LoggerContext).let { context ->
+            context.getLogger("ROOT").apply {
+                level = Level.TRACE // 将日志级别设置为 TRACE，以便过滤器可以处理所有级别的日志
+                detachAndStopAllAppenders() // 清除现有的 appender
 
-    public static void configure(CoreConfig.Log conf) {
-        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
-        Logger rootLogger = context.getLogger("ROOT");
-        rootLogger.setLevel(Level.TRACE); // 将日志级别设置为 TRACE，以便过滤器可以处理所有级别的日志
-        rootLogger.detachAndStopAllAppenders(); // 清除现有的 appender
+                addAppender(getTerminalAppender(context, conf.console))
 
-        rootLogger.addAppender(getTerminalAppender(context, conf.console()));
-
-        if (!AVAL_LEVELS.contains(conf.console().level().toUpperCase())) {
-            System.out.printf("<!> 无效的终端日志级别：%s，使用默认级别 - DEBUG\n", conf.console().level());
-        }
-        if (!AVAL_LEVELS.contains(conf.file().level().toUpperCase())) {
-            System.out.printf("<!> 无效的文件日志级别：%s，使用默认级别 - DEBUG\n", conf.file().level());
-        }
-
-        if (!conf.file().level().equalsIgnoreCase("OFF")) {
-            // 确保日志目录存在
-            File logDir = new File("logs");
-            if (!logDir.exists() && logDir.mkdirs()) {
-                System.out.println("创建日志目录: " + logDir.getAbsolutePath());
+                if (!conf.file.level.equals("OFF", ignoreCase = true)) {
+                    // 确保日志目录存在
+                    val logDir = File("logs")
+                    if (!logDir.exists() && logDir.mkdirs()) {
+                        println("创建日志目录: " + logDir.absolutePath)
+                    }
+                    addAppender(getFileAppender(context, conf.file))
+                }
             }
-            rootLogger.addAppender(getFileAppender(context, conf.file()));
         }
     }
 
-    public static CustomTerminalAppender getTerminalAppender(
-      LoggerContext context,
-      CoreConfig.Log.ConsoleLogSettings conf
-    ) {
-        var terminalAppender = Instance.get(CustomTerminalAppender.class);
-        terminalAppender.setName("terminal");
-        terminalAppender.setContext(context);
+    fun getTerminalAppender(
+        loggerContext: LoggerContext,
+        conf: ConsoleLogSettings
+    ): CustomTerminalAppender {
+        if (!AVAL_LEVELS.contains(conf.level.uppercase(Locale.getDefault()))) {
+            System.out.printf("<!> 无效的终端日志级别：%s，使用默认级别 - DEBUG\n", conf.level)
+        }
 
-        var terminalFilter = createCustomFilter(Level.toLevel(conf.level()), conf.filterRule());
-        terminalAppender.addFilter(terminalFilter);
-
-        terminalAppender.start();
-
-        return terminalAppender;
+        return Instance.get(CustomTerminalAppender::class.java).apply {
+            name = "terminal"
+            context = loggerContext
+            addFilter(createCustomFilter(Level.toLevel(conf.level), conf.filterRule))
+            start()
+        }
     }
 
-    private static CustomFilter createCustomFilter(Level defaultLevel, List<String> rules) {
-        CustomFilter filter = new CustomFilter();
-        filter.setDefaultLevel(defaultLevel);
-        for (String rule : rules) {
-            String[] parts = rule.split(":");
-            String packageName = parts[0];
-            String level = parts.length > 1 ? parts[1].toUpperCase() : "OFF";
+    private fun getFileAppender(
+        loggerContext: LoggerContext,
+        conf: FileLogSettings
+    ): FileAppender<ILoggingEvent> {
+        if (!AVAL_LEVELS.contains(conf.level.uppercase(Locale.getDefault()))) {
+            System.out.printf("<!> 无效的文件日志级别：%s，使用默认级别 - DEBUG\n", conf.level)
+        }
 
-            if (!AVAL_LEVELS.contains(level)) {
-                // 无效的日志级别，跳过
-                continue;
+        return with(RollingFileAppender<ILoggingEvent>()) {
+            name = "file"
+            context = loggerContext
+            file = "logs/latest.log"
+
+            rollingPolicy = TimeBasedRollingPolicy<ILoggingEvent>().apply {
+                context = loggerContext
+                fileNamePattern = "logs/maibot-%d{yyyy-MM-dd}.log"
+                maxHistory = conf.maxRollingFiles
+
+                setParent(this@with)
+                setTotalSizeCap(FileSize(FileSize.MB_COEFFICIENT * conf.maxTotalSizeMb))
+                start()
             }
 
-            filter.addRule(packageName, Level.valueOf(level));
+            encoder = PatternLayoutEncoder().apply {
+                context = loggerContext
+                pattern =
+                    "%d{yyyy-MM-dd HH:mm:ss} " +
+                            "[%thread] " +
+                            "%-5level " +
+                            "%logger - " +
+                            "%msg" +
+                            "%n"
+                start()
+            }
+
+            addFilter(createCustomFilter(Level.toLevel(conf.level), conf.filterRule))
+            start()
+
+            this
         }
-        filter.start();
-        return filter;
     }
 
-    private static FileAppender<ILoggingEvent> getFileAppender(
-      LoggerContext context,
-      CoreConfig.Log.FileLogSettings conf
-    ) {
-        var fileAppender = new RollingFileAppender<ILoggingEvent>();
-        fileAppender.setName("file");
-        fileAppender.setContext(context);
-        fileAppender.setFile("logs/latest.log");
+    private fun createCustomFilter(defaultLevel: Level, rules: List<String>): CustomFilter {
+        return CustomFilter().apply {
+            this.defaultLevel = defaultLevel
 
-        {
-            TimeBasedRollingPolicy<ILoggingEvent> rollingPolicy = new TimeBasedRollingPolicy<>();
-            rollingPolicy.setContext(context);
-            rollingPolicy.setParent(fileAppender);
-            rollingPolicy.setFileNamePattern("logs/maibot-%d{yyyy-MM-dd}.log");
-            rollingPolicy.setMaxHistory(conf.maxRollingFiles());
-            rollingPolicy.setTotalSizeCap(new FileSize(FileSize.MB_COEFFICIENT * conf.maxTotalSizeMb()));
-            rollingPolicy.start();
-            fileAppender.setRollingPolicy(rollingPolicy);
+            rules.map {
+                val parts = it.split(":".toRegex()).dropLastWhile { part -> part.isEmpty() }.toTypedArray()
+                val level = if (parts.size > 1) parts[1].uppercase(Locale.getDefault()) else "OFF"
+
+                return@map if (!AVAL_LEVELS.contains(level)) {
+                    System.out.printf("<!> 无效的日志过滤规则：%s，跳过\n", it)
+                    null
+                } else {
+                    Pair(parts[0], level)
+                }
+            }.filterNotNull().forEach { (packageName, level) ->
+                addRule(packageName, Level.valueOf(level))
+            }
+
+            start()
         }
-
-        {
-            PatternLayoutEncoder fileEncoder = new PatternLayoutEncoder();
-            fileEncoder.setContext(context);
-            fileEncoder.setPattern("%d{yyyy-MM-dd HH:mm:ss} [%thread] " +
-                                     "%-5level " +
-                                     "%logger - " +
-                                     "%msg" +
-                                     "%n");
-            fileEncoder.start();
-            fileAppender.setEncoder(fileEncoder);
-        }
-
-        var fileFilter = createCustomFilter(Level.toLevel(conf.level()), conf.filterRule());
-        fileAppender.addFilter(fileFilter);
-
-        fileAppender.start();
-
-        return fileAppender;
     }
 
-    public static void setTerminalLineReader(LineReader reader) {
-        Logger logger = (Logger) LoggerFactory.getLogger("ROOT");
-        var terminalAppender = (CustomTerminalAppender) logger.getAppender("terminal");
-        terminalAppender.setLineReader(reader);
+    @JvmStatic
+    fun setTerminalLineReader(reader: LineReader?) {
+        val logger = LoggerFactory.getLogger("ROOT") as Logger
+        val terminalAppender = logger.getAppender("terminal") as CustomTerminalAppender
+        terminalAppender.lineReader = reader
     }
 }
 

@@ -1,136 +1,114 @@
-package org.maibot.core.manager;
+package org.maibot.core.manager
 
-import jakarta.persistence.EntityManager;
-import org.maibot.sdk.ioc.Component;
-import org.maibot.sdk.storage.db.dao.InteractionEntity;
-import org.maibot.sdk.storage.db.dao.InteractionGroup;
-import org.maibot.sdk.storage.db.dao.InteractionStream;
-import org.maibot.sdk.storage.domain.StreamType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.*;
+import jakarta.persistence.EntityManager
+import org.maibot.sdk.ioc.Component
+import org.maibot.sdk.manager.InteractionStreamManager
+import org.maibot.sdk.storage.db.dao.InteractionEntity
+import org.maibot.sdk.storage.db.dao.InteractionGroup
+import org.maibot.sdk.storage.db.dao.InteractionStream
+import org.maibot.sdk.storage.db.dao.InteractionStream.Companion.idGen
+import org.maibot.sdk.storage.domain.StreamType
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
-public class InteractionStreamManagerImpl implements org.maibot.sdk.manager.InteractionStreamManager {
-    private static final Logger log = LoggerFactory.getLogger(InteractionStreamManagerImpl.class);
+class InteractionStreamManagerImpl : InteractionStreamManager {
+    private val lockMap = ConcurrentHashMap<String, CompletableFuture<InteractionStream>>()
 
-    private final ConcurrentMap<String, CompletableFuture<InteractionStream>> lockMap = new ConcurrentHashMap<>();
-
-    private String generateKey(StreamType type, Long entityId, Long groupId) {
-        return type.name()
-          + ":"
-          + (entityId == null ? "" : entityId)
-          + ":"
-          + (groupId == null ? "" : groupId);
+    private fun generateKey(type: StreamType, entityId: Long?, groupId: Long?): String {
+        return ("${type.name}:${entityId ?: ""}:${groupId ?: ""}")
     }
 
-    @Override
-    public InteractionStream getOrCreateIfAbsent(
-      EntityManager em,
-      StreamType type,
-      InteractionEntity interactionEntity,
-      InteractionGroup interactionGroup
-    ) {
-        String key = switch (type) {
-            case PRIVATE -> {
-                if (interactionEntity == null) {
-                    throw new IllegalArgumentException("InteractionEntity cannot be null for PRIVATE stream type.");
-                }
-                yield generateKey(
-                  type,
-                  interactionEntity.getId(),
-                  null
-                );
+    override fun getOrCreateIfAbsent(
+        em: EntityManager, type: StreamType, interactionEntity: InteractionEntity?, interactionGroup: InteractionGroup?
+    ): InteractionStream? {
+        val key = when (type) {
+            StreamType.PRIVATE -> {
+                require(interactionEntity != null) { "InteractionEntity cannot be null for PRIVATE stream type." }
+                generateKey(
+                    type, interactionEntity.id, null
+                )
             }
-            case GROUP -> {
-                if (interactionGroup == null) {
-                    throw new IllegalArgumentException("InteractionGroup cannot be null for GROUP stream types.");
-                }
-                yield generateKey(
-                  type,
-                  null,
-                  interactionGroup.getId()
-                );
+
+            StreamType.GROUP -> {
+                require(interactionGroup != null) { "InteractionGroup cannot be null for GROUP stream types." }
+                generateKey(
+                    type, null, interactionGroup.id
+                )
             }
-            default -> throw new IllegalArgumentException("Unsupported StreamType: " + type);
-        };
+
+            else -> throw IllegalArgumentException("Unsupported StreamType: $type")
+        }
+
         // 使用锁对象，防止重复查询和创建
-        var lockObject = new CompletableFuture<InteractionStream>();
-        var mappedLock = lockMap.putIfAbsent(key, lockObject);
+        val lockObject = CompletableFuture<InteractionStream>()
+        val mappedLock = lockMap.putIfAbsent(key, lockObject)
 
         if (mappedLock == null) {
             // 当前线程获得锁，执行获取或创建逻辑
             try {
-                InteractionStream stream;
-                switch (type) {
-                    case PRIVATE -> {
-                        // 检查实体是否存在
-                        var query = em.createQuery(
-                          "SELECT s FROM InteractionStream s WHERE s.type = :type AND s.entity.id = :entityId",
-                          InteractionStream.class
-                        );
-                        query.setParameter("type", StreamType.PRIVATE);
-                        query.setParameter("entityId", interactionEntity.getId());
-                        var results = query.getResultList();
+                val stream: InteractionStream
+                when (type) {
+                    StreamType.PRIVATE -> {
+                        // 检查实例是否存在
+                        val query = em.createQuery(
+                            "SELECT s FROM InteractionStream s WHERE s.type = :type AND s.entity.id = :entityId",
+                            InteractionStream::class.java
+                        ).apply {
+                            setParameter("type", StreamType.PRIVATE)
+                            setParameter("entityId", interactionEntity!!.id)
+                        }
 
-                        if (results.isEmpty()) {
-                            // 不存在则创建新实体
-                            stream = new InteractionStream();
-                            stream.setId(InteractionStream.idGen(StreamType.PRIVATE, interactionEntity.getId()));
-                            stream.setType(StreamType.PRIVATE);
-                            stream.setEntity(interactionEntity);
-                            em.persist(stream);
-                        } else {
-                            // 已存在则直接返回
-                            stream = results.getFirst();
+                        stream = query.resultList.firstOrNull() ?: InteractionStream().apply { // 不存在则创建新实例
+                            this.id = idGen(StreamType.PRIVATE, interactionEntity!!.id!!)
+                            this.type = StreamType.PRIVATE
+                            this.entity = interactionEntity
+                            em.persist(this)
                         }
                     }
-                    case GROUP -> {
-                        // 检查实体是否存在
-                        var query = em.createQuery(
-                          "SELECT s FROM InteractionStream s WHERE s.type = :type AND s.group.id = :groupId",
-                          InteractionStream.class
-                        );
-                        query.setParameter("type", StreamType.GROUP);
-                        query.setParameter("groupId", interactionGroup.getId());
-                        var results = query.getResultList();
 
-                        if (results.isEmpty()) {
-                            // 不存在则创建新实体
-                            stream = new InteractionStream();
-                            stream.setId(InteractionStream.idGen(StreamType.GROUP, interactionGroup.getId()));
-                            stream.setType(StreamType.GROUP);
-                            stream.setGroup(interactionGroup);
-                            em.persist(stream);
-                        } else {
-                            // 已存在则直接返回
-                            stream = results.getFirst();
+                    StreamType.GROUP -> {
+                        // 检查实例是否存在
+                        val query = em.createQuery(
+                            "SELECT s FROM InteractionStream s WHERE s.type = :type AND s.group.id = :groupId",
+                            InteractionStream::class.java
+                        ).apply {
+                            setParameter("type", StreamType.GROUP)
+                            setParameter("groupId", interactionGroup!!.id)
+                        }
+
+                        stream = query.resultList.firstOrNull() ?: InteractionStream().apply { // 不存在则创建新实例
+                            this.id = idGen(StreamType.GROUP, interactionGroup!!.id!!)
+                            this.type = StreamType.GROUP
+                            this.group = interactionGroup
+                            em.persist(this)
                         }
                     }
-                    default -> // 理论上不会到达这里
-                      throw new IllegalArgumentException("Unsupported StreamType: " + type);
                 }
-                lockObject.complete(stream);
-                return stream;
-            } catch (Exception e) {
-                log.warn("An exception occurred while creating InteractionStream for key: {}", key, e);
-                return null;
+                lockObject.complete(stream)
+                return stream
+            } catch (e: Exception) {
+                log.warn("An exception occurred while creating InteractionStream for key: {}", key, e)
+                return null
             } finally {
-                lockMap.remove(key);
+                lockMap.remove(key)
             }
         } else {
             // 其他线程等待锁完成
             try {
-                var entity = mappedLock.get();
-                em.merge(entity); // 将实体附加到当前 EntityManager 上
-                return entity;
-            } catch (CancellationException | ExecutionException ignored) {
-                return null;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
+                val stream = mappedLock.get()
+                em.merge(stream) // 将实例附加到当前 EntityManager 上
+                return stream
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
             }
+            return null
         }
+    }
+
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(InteractionStreamManagerImpl::class.java)
     }
 }

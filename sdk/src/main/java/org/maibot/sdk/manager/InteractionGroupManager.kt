@@ -1,15 +1,15 @@
-package org.maibot.sdk.manager;
+package org.maibot.sdk.manager
 
-import jakarta.persistence.EntityManager;
-import org.maibot.sdk.storage.db.dao.InteractionGroup;
+import jakarta.persistence.EntityManager
+import org.maibot.sdk.storage.db.dao.InteractionGroup
 
-public interface InteractionGroupManager {
-    InteractionGroup getOrCreatIfAbsent(
-      EntityManager em,
-      String platform,
-      String platformGroupId,
-      String groupName
-    );
+interface InteractionGroupManager {
+    fun getOrCreatIfAbsent(
+        em: EntityManager,
+        platform: String,
+        platformGroupId: String,
+        groupName: String?
+    ): InteractionGroup?
 
-    InteractionGroup get(EntityManager em, String platform, String platformGroupId);
+    fun get(em: EntityManager, platform: String, platformGroupId: String): InteractionGroup?
 }

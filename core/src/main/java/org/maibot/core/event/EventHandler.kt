@@ -1,65 +1,51 @@
-package org.maibot.core.event;
+package org.maibot.core.event
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandler
 
-public abstract class EventHandler implements ChannelInboundHandler {
-
-
-    @Override
-    public void channelRegistered(ChannelHandlerContext ctx)
-    throws Exception {
-        ctx.fireChannelRegistered();
+abstract class EventHandler : ChannelInboundHandler {
+    @Throws(Exception::class)
+    override fun channelRegistered(ctx: ChannelHandlerContext) {
+        ctx.fireChannelRegistered()
     }
 
-    @Override
-    public void channelUnregistered(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelUnregistered(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void channelActive(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelActive(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelInactive(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelRead(ctx: ChannelHandlerContext?, msg: Any?) {
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelReadComplete(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun userEventTriggered(ctx: ChannelHandlerContext?, evt: Any?) {
     }
 
-    @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun channelWritabilityChanged(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-    throws Exception {
-
+    @Throws(Exception::class)
+    override fun exceptionCaught(ctx: ChannelHandlerContext?, cause: Throwable?) {
     }
 
-    @Override
-    public void handlerAdded(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun handlerAdded(ctx: ChannelHandlerContext?) {
     }
 
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx)
-    throws Exception {
+    @Throws(Exception::class)
+    override fun handlerRemoved(ctx: ChannelHandlerContext?) {
     }
 }

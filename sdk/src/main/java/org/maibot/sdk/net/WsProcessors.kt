@@ -1,49 +1,34 @@
-package org.maibot.sdk.net;
+package org.maibot.sdk.net
 
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import org.maibot.sdk.exceptions.FatalError;
+import io.netty.channel.ChannelHandler
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler
+import org.maibot.sdk.exceptions.FatalError
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class WsProcessors extends ChannelInboundHandlerAdapter {
-    private final String path;
-
-    private final List<Class<?>> handlers;
+class WsProcessors(val path: String, handlers: MutableList<Class<*>>) : ChannelInboundHandlerAdapter() {
+    val handlers: MutableList<Class<*>>
 
     /**
      * @param path     WebSocket路径
      * @param handlers 处理器类列表
      */
-    public WsProcessors(String path, List<Class<?>> handlers) {
-        this.path = path;
+    init {
+        val finalHandlers = ArrayList<Class<*>>()
 
-        List<Class<?>> finalHandlers = new ArrayList<>();
-
-        for (Class<?> handler : handlers) {
-            if (handler == WebSocketServerProtocolHandler.class) {
-                continue;
+        for (handler in handlers) {
+            if (handler == WebSocketServerProtocolHandler::class.java) {
+                continue
             }
             // 检查Handler类是否是ChannelHandler接口的实现类
-            if (!ChannelHandler.class.isAssignableFrom(handler)) {
-                throw new FatalError(
-                  "Handler class %s must implement io.netty.channel.ChannelHandler or its subclass.",
-                  handler.getName()
-                );
+            if (!ChannelHandler::class.java.isAssignableFrom(handler)) {
+                throw FatalError(
+                    "Handler class ${handler.getName()} must implement io.netty.channel.ChannelHandler or its subclass."
+                )
             }
-            finalHandlers.add(handler);
+
+            finalHandlers.add(handler)
         }
 
-        this.handlers = finalHandlers;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public List<Class<?>> getHandlers() {
-        return handlers;
+        this.handlers = finalHandlers
     }
 }

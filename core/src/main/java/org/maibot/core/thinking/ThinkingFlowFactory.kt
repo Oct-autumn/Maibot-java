@@ -1,29 +1,22 @@
-package org.maibot.core.thinking;
+package org.maibot.core.thinking
 
-import org.maibot.sdk.ioc.AutoInject;
-import org.maibot.sdk.ioc.ObjectFactory;
-import org.maibot.sdk.ioc.Value;
+import org.maibot.sdk.ioc.AutoInject
+import org.maibot.sdk.ioc.ObjectFactory
+import org.maibot.sdk.ioc.Value
 
 @ObjectFactory
-public class ThinkingFlowFactory {
-    private final int observationWindowSize;
+class ThinkingFlowFactory @AutoInject private constructor(
+    @param:Value($$"${thinking.observation_window_size}") private val observationWindowSize: Int
+) {
+    private var flowId: String? = null
 
-    private String flowId;
-
-    @AutoInject
-    private ThinkingFlowFactory(
-      @Value("${thinking.observation_window_size}") int observationWindowSize
-    ) {
-        this.observationWindowSize = observationWindowSize;
-    }
-
-    public ThinkingFlowFactory setFlowId(String flowId) {
-        this.flowId = flowId;
-        return this;
+    fun setFlowId(flowId: String): ThinkingFlowFactory {
+        this.flowId = flowId
+        return this
     }
 
 
-    public ThinkingFlow build() {
-        return new ThinkingFlow(this.observationWindowSize, this.flowId);
+    fun build(): ThinkingFlow {
+        return ThinkingFlow(this.observationWindowSize, this.flowId)
     }
 }

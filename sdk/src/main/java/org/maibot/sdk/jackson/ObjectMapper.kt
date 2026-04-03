@@ -1,7 +1,7 @@
-package org.maibot.sdk.jackson;
+package org.maibot.sdk.jackson
 
-import org.maibot.sdk.ioc.Component;
+import org.maibot.sdk.ioc.Component
+import tools.jackson.databind.ObjectMapper
 
 @Component
-class ObjectMapper extends tools.jackson.databind.ObjectMapper {
-}
+internal class ObjectMapper : ObjectMapper()

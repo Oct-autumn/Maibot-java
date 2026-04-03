@@ -1,94 +1,45 @@
-package org.maibot.sdk.storage.db.dao;
+package org.maibot.sdk.storage.db.dao
 
-import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.Instant;
-import java.util.List;
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.UpdateTimestamp
+import java.time.Instant
 
 @Entity
 @Table(
-  name = "interaction_group",
-  uniqueConstraints = {@UniqueConstraint(columnNames = {"platform", "platform_group_id"})},
-  indexes = {@Index(name = "idx_platform_group", columnList = "platform, platform_group_id")}
+    name = "interaction_group",
+    uniqueConstraints = [UniqueConstraint(columnNames = ["platform", "platform_group_id"])],
+    indexes = [Index(name = "idx_platform_group", columnList = "platform, platform_group_id")]
 )
-public class InteractionGroup {
+class InteractionGroup {
+    @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    var id: Long? = null
 
-    /// 平台名称
+    /** 平台名称 */
+    @JvmField
     @Column(name = "platform", nullable = false)
-    private String platform;
-    /// 平台群组ID
+    var platform: String? = null
+
+    /** 平台群组ID */
+    @JvmField
     @Column(name = "platform_group_id", nullable = false)
-    private String platformGroupId;
+    var platformGroupId: String? = null
 
-    /// 群组名称
+    /** 群组名称 */
+    @JvmField
     @Column(name = "group_name")
-    private String groupName;
+    var groupName: String? = null
 
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL)
-    private List<GroupMember> members;
+    @OneToMany(mappedBy = "group", cascade = [CascadeType.ALL])
+    val members: MutableList<GroupMember?>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
-    private Instant createdAt;
+    var createdAt: Instant? = null
 
     @Column(name = "updated_at", nullable = false)
     @UpdateTimestamp
-    private Instant updatedAt;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPlatform() {
-        return platform;
-    }
-
-    public void setPlatform(String platform) {
-        this.platform = platform;
-    }
-
-    public String getPlatformGroupId() {
-        return platformGroupId;
-    }
-
-    public void setPlatformGroupId(String platformGroupId) {
-        this.platformGroupId = platformGroupId;
-    }
-
-    public String getGroupName() {
-        return groupName;
-    }
-
-    public void setGroupName(String groupName) {
-        this.groupName = groupName;
-    }
-
-    public List<GroupMember> getMembers() {
-        return members;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    var updatedAt: Instant? = null
 }

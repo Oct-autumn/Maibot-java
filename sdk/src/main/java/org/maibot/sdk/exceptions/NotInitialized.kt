@@ -1,7 +1,3 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
-public class NotInitialized extends UnignorableException {
-    public NotInitialized(String format, Object... args) {
-        super(format, args);
-    }
-}
+class NotInitialized(format: String, vararg args: Any?) : UnignorableException(format, *args)

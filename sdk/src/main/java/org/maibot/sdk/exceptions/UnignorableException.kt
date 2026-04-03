@@ -1,22 +1,17 @@
-package org.maibot.sdk.exceptions;
+package org.maibot.sdk.exceptions
 
 /**
  * Exception indicating that an error cannot be ignored and must be addressed.
  */
-public class UnignorableException extends RuntimeException {
-    public UnignorableException(String message) {
-        super(message);
-    }
+@Suppress("unused")
+open class UnignorableException : RuntimeException {
+    constructor(message: String) : super(message)
 
-    public UnignorableException(Throwable cause) {
-        super(cause);
-    }
+    constructor(cause: Throwable) : super(cause)
 
-    public UnignorableException(String format, Object... args) {
-        super(String.format(format, args));
-
-        if (args.length > 0 && args[args.length - 1] instanceof Throwable) {
-            this.initCause((Throwable) args[args.length - 1]);
+    constructor(format: String, vararg args: Any?) : super(String.format(format, *args)) {
+        if (args.isNotEmpty() && args[args.size - 1] is Throwable) {
+            this.initCause(args[args.size - 1] as Throwable?)
         }
     }
 }

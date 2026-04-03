@@ -1,51 +1,37 @@
-package org.maibot.sdk.net;
+package org.maibot.sdk.net
 
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.netty.channel.ChannelFutureListener
+import io.netty.channel.ChannelHandlerContext
+import io.netty.handler.codec.http.FullHttpRequest
+import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpResponse
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
-public abstract class HttpRequestProcessor {
-    protected final Logger log;
+abstract class HttpRequestProcessor(
+    @JvmField val method: HttpMethod,
+    @JvmField val path: String,
+    protected val log: Logger
+) {
+    constructor(method: HttpMethod, path: String, loggerClass: Class<*>) : this(
+        method,
+        path,
+        LoggerFactory.getLogger(loggerClass)
+    )
 
-    private final HttpMethod method;
-
-    private final String path;
-
-
-    public HttpRequestProcessor(HttpMethod method, String path, Class<?> loggerClass) {
-        this(method, path, LoggerFactory.getLogger(loggerClass));
+    @Throws(Exception::class)
+    fun process(ctx: ChannelHandlerContext, req: FullHttpRequest) {
+        handleRequest(req)?.let { resp ->
+            log.trace("发送响应 {}", resp.status().code())
+            ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE)
+        } ?: log.trace("无响应数据")
     }
 
-    public HttpRequestProcessor(HttpMethod method, String path, Logger logger) {
-        this.method = method;
-        this.path = path;
-        this.log = logger;
-    }
-
-    public HttpMethod getMethod() {
-        return method;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void process(ChannelHandlerContext ctx, FullHttpRequest req)
-    throws Exception {
-        var resp = handleRequest(req);
-        if (resp == null) {
-            log.trace("无响应数据");
-        } else {
-            log.trace("发送响应 {}", resp.status().code());
-            ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
-        }
-    }
-
-    @SuppressWarnings("RedundantThrows") // 抑制警告：声明的异常从不在任何方法实现中抛出
-    abstract public HttpResponse handleRequest(FullHttpRequest req)
-    throws Exception;
+    /**
+     * 处理HTTP请求并生成响应
+     *
+     * 注意：实现类需要确保无状态，以便在多线程环境中安全使用。
+     */
+    @Throws(Exception::class)  // 抑制警告：声明的异常从不在任何方法实现中抛出
+    abstract fun handleRequest(req: FullHttpRequest): HttpResponse?
 }

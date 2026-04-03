@@ -10,12 +10,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.Properties;
 
 public class BuildInfo {
-    private final Semver  coreVersion;
+    private final Semver  launcherVersion;
     private final Instant buildTime;
 
     public BuildInfo()
     throws Exception {
-        try (InputStream input = getClass().getResourceAsStream("/META-INF/build-inf.properties")) {
+        try (InputStream input = getClass().getResourceAsStream("/org/maibot/launcher/build-inf.properties")) {
             assert input != null;
 
             Properties prop = new Properties();
@@ -24,15 +24,15 @@ public class BuildInfo {
             var versionStr = prop.getProperty("version", "0.0.0");
             var buildTimeStr = prop.getProperty("buildTime", "0");
 
-            this.coreVersion = new Semver(versionStr);
+            this.launcherVersion = new Semver(versionStr);
             this.buildTime = Instant.ofEpochSecond(Long.parseLong(buildTimeStr));
         } catch (IOException e) {
             throw new Exception("An error occurred when loading build info.", e);
         }
     }
 
-    public Semver coreVersion() {
-        return this.coreVersion;
+    public Semver launcherVersion() {
+        return this.launcherVersion;
     }
 
     public String getBuildTime() {

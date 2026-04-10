@@ -1,11 +1,11 @@
 package org.maibot.core.util
 
 import org.maibot.core.modloader.ModManager
-import org.maibot.sdk.task.TaskExecuteService
 import org.maibot.sdk.exceptions.FatalError
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.task.ManagedTask
+import org.maibot.sdk.task.TaskExecuteService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.*
@@ -38,6 +38,11 @@ class TaskExecuteServiceImpl
 
     init {
         val processorCount = Runtime.getRuntime().availableProcessors()
+
+        Thread.setDefaultUncaughtExceptionHandler { t: Thread, e: Throwable ->
+            log.error("An uncaught exception occurred in thread {}", t.name, e)
+            exitProcess(1)
+        }
 
         this.executor = ThreadPoolExecutor(
             processorCount, processorCount * 2, 60L, TimeUnit.SECONDS, LinkedBlockingQueue(), object : ThreadFactory {

@@ -20,7 +20,6 @@ import org.maibot.core.commandline.TerminalController
 import org.maibot.core.config.BuildInfo
 import org.maibot.core.config.CoreConfig
 import org.maibot.core.ioc.Instance
-import org.maibot.core.ioc.Instance.close
 import org.maibot.core.ioc.Instance.scanImplementations
 import org.maibot.core.log.LogConfig
 import org.maibot.core.modloader.ModManager
@@ -142,28 +141,11 @@ class MaibotMain
 
             // <!-- 从此处开始可以正常使用Logger -->
 
-            Thread.setDefaultUncaughtExceptionHandler { t: Thread, e: Throwable ->
-                log.error("An uncaught exception occurred in thread {}", t.name, e)
-                exitProcess(1)
-            }
-
             // 彩蛋
             println(render("\n@{FG#FFB6C1 {}}@\n", randEly()))
 
             log.info("注册关闭钩子...")
-            val shutdownThread = Thread {
-                log.warn("正在关闭 MaiBot...")
-                close()
-                log.info("MaiBot 已成功关闭")
-                // 彩蛋
-                println(
-                    render(
-                        "\n>> @{FG#FFB6C1 ··· · · -·-- --- ··- - --- -- --- ·-· ·-· --- ·--}@ <<\n"
-                    )
-                )
-            }
-            shutdownThread.setName("Shutdown-Hook")
-            Runtime.getRuntime().addShutdownHook(shutdownThread)
+            ShutdownHook.register(log)
 
             // Mod加载需要放在所有组件启动之前
             // 因为组件可能依赖Mod提供的功能

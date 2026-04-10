@@ -13,11 +13,12 @@ data class ModelApiConfig(
         @field:JsonProperty(value = "name", required = true) val name: String,
         @field:JsonProperty(value = "base_url", required = true) val baseUrl: String,
         @field:JsonProperty(value = "api_key", required = true) val apiKey: String,
-        @field:JsonProperty(value = "client_type") val clientType: String = "openai",
-        @field:JsonProperty(value = "timeout") val timeout: Int = 60,
+        @field:JsonProperty(value = "client_type") val clientType: String = "OpenAIClassic",
+        @field:JsonProperty(value = "connect_timeout") val connectTimeout: Int = 60,
+        @field:JsonProperty(value = "retry_delay_base") val retryDelayBase: Long = 5000,
         @field:JsonProperty(value = "default_max_retry") val defaultMaxRetry: Int = 3,
         @field:JsonProperty(value = "default_temperature") val defaultTemperature: Double = 0.7,
-        @field:JsonProperty(value = "default_max_tokens") val defaultMaxTokens: Int = 4096,
+        @field:JsonProperty(value = "default_max_tokens") val defaultMaxTokens: Long = 4096,
     )
 
     @JvmRecord
@@ -27,10 +28,11 @@ data class ModelApiConfig(
         @field:JsonProperty(value = "name") val name: String?,
         @field:JsonProperty(value = "price_in") val priceIn: Double = 0.0,
         @field:JsonProperty(value = "price_out") val priceOut: Double = 0.0,
+        @field:JsonProperty(value = "retry_delay_base") val retryDelayBase: Long? = null,
         @field:JsonProperty(value = "max_retry") val maxRetry: Int? = null,
         @field:JsonProperty(value = "temperature") val temperature: Double? = null,
-        @field:JsonProperty(value = "max_tokens") val maxTokens: Int? = null,
+        @field:JsonProperty(value = "max_tokens") val maxTokens: Long? = null,
+        @field:JsonProperty(value = "enable_thinking") val enableThinking: Boolean = false,
         @field:JsonProperty(value = "force_stream_mode") val forceStreamMode: Boolean = false,
-        @field:JsonProperty(value = "enable_thinking") val enableThinking: Boolean = false
     )
 }

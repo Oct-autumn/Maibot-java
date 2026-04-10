@@ -32,35 +32,43 @@ import java.time.Instant
     ), Index(name = "idx_model_api_request_api_provider", columnList = "api_provider")]
 )
 class ModelApiRequest {
+    @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
 
     /** 请求时间戳 */
+    @JvmField
     @Column(name = "timestamp", nullable = false)
     var timestamp: Instant? = null
 
     /** 任务名称 */
+    @JvmField
     @Column(name = "task_name", nullable = false)
     var taskName: String? = null
 
     /** 模型名称，关联模型配置表中的模型名称字段 */
+    @JvmField
     @Column(name = "model_name", nullable = false)
     var modelName: String? = null
 
     /** API提供商名称，关联模型配置表中的API提供商名称字段 */
+    @JvmField
     @Column(name = "api_provider", nullable = false)
     var apiProvider: String? = null
 
     /** 输入的token数量 */
+    @JvmField
     @Column(name = "input_tokens", nullable = false)
     var inputTokens: Long? = null
 
     /** 输出的token数量 */
+    @JvmField
     @Column(name = "output_tokens", nullable = false)
     var outputTokens: Long? = null
 
     /** 本次调用的总费用，单位为元 */
+    @JvmField
     @Column(name = "total_cost", nullable = false)
     var totalCost: Double? = null
 }

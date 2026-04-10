@@ -16,22 +16,27 @@ import java.time.Instant
     )]
 )
 class InteractionStream {
+    @JvmField
     @Id
     var id: String? = null
 
+    @JvmField
     @Column(name = "type", nullable = false)
     var type: StreamType? = null
 
+    @JvmField
     @ManyToOne
     @JoinColumn(name = "entity_id", referencedColumnName = "id")
     var entity: InteractionEntity? = null
-    
+
+    @JvmField
     @ManyToOne
     @JoinColumn(name = "group_id", referencedColumnName = "id")
     var group: InteractionGroup? = null
 
+    @JvmField
     @OneToMany(mappedBy = "stream", cascade = [CascadeType.ALL])
-    val messages: MutableList<Message?>? = null
+    val messages: MutableList<Message>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp

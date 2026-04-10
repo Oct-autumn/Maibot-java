@@ -8,7 +8,6 @@ import org.maibot.sdk.storage.db.dao.BinFile
 import org.maibot.sdk.util.HashUtils.getSha256Hash
 import org.maibot.sdk.util.LocalBinFileUtils.getFile
 import org.maibot.sdk.util.LocalBinFileUtils.saveFile
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -126,6 +125,6 @@ class BinFileManagerImpl : BinFileManager {
     }
 
     companion object {
-        private val log: Logger = LoggerFactory.getLogger(BinFileManagerImpl::class.java)
+        private val log = LoggerFactory.getLogger(BinFileManagerImpl::class.java)
     }
 }

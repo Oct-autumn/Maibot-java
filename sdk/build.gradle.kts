@@ -38,6 +38,8 @@ dependencies {
 
     // Jackson for JSON parsing
     implementation("tools.jackson.core:jackson-databind:3.1.0")
+    // Jackson Schema module for JSON Schema generation
+    implementation("tools.jackson.module:jackson-module-jsonSchema:3.1.0")
 
     // Hibernate for ORM
     implementation("org.hibernate.orm:hibernate-core:7.2.7.Final")

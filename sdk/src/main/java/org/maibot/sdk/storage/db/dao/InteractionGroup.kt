@@ -33,7 +33,7 @@ class InteractionGroup {
     var groupName: String? = null
 
     @OneToMany(mappedBy = "group", cascade = [CascadeType.ALL])
-    val members: MutableList<GroupMember?>? = null
+    val members: MutableList<GroupMember>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp

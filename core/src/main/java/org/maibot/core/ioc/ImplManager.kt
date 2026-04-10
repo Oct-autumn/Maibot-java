@@ -5,6 +5,7 @@ import io.github.classgraph.ClassGraphException
 import org.maibot.sdk.exceptions.ClassNoImplementation
 import org.maibot.sdk.exceptions.FatalError
 import org.maibot.sdk.ioc.Component
+import org.maibot.sdk.ioc.Specify
 import java.lang.reflect.Modifier
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -42,32 +43,29 @@ internal class ImplManager {
         }
 
         for (clazz in classes) {
-            var anno = clazz.getAnnotation(Component::class.java)
-            if (anno == null) {
-                // 说明@Component作为元注解使用，获取实际注解
-                anno = clazz.annotations.map { it.annotationClass.java.getAnnotation(Component::class.java) }
-                    .filterNotNull().firstOrNull() ?: throw FatalError( // 理论上不会发生，因为前面已经通过ClassGraph筛选过了
-                    "Component annotation not found on class %s during registration. This shouldn't happen.",
-                    clazz.getName()
-                )
+            // 实例命名优先级：Specify > getSimpleName()
 
-            }
+            // 获取 @Specify 注解（如果有）
+            val specifyAnno =
+                clazz.getAnnotation(Specify::class.java)  // 直接获取 @Specify 注解
+                    ?: clazz.annotations.map { it.annotationClass.java.getAnnotation(Specify::class.java) }
+                        .filterNotNull().firstOrNull()    // 若不是直接使用，则获取元注解中的 @Specify 注解
+            // 获取 @Component 注解，使用断言是因为前面的扫描已经保证了这些类都必须有 @Component 注解（直接或通过元注解）
+            val componentAnno = clazz.getAnnotation(Component::class.java) // 直接获取 @Component 注解
+                ?: clazz.annotations.map { it.annotationClass.java.getAnnotation(Component::class.java) }
+                    .filterNotNull().firstOrNull()!!    // 获取 @Component 注解（同样支持元注解）
 
-            // 获取组件名称，如果注解中没有指定，则使用类名
-            var name = anno.name
-            if (name.isBlank()) {
-                name = clazz.getSimpleName()
-            }
+            val name = specifyAnno?.name ?: clazz.simpleName
 
             // 注册类为自身的实现
-            this.putImpl(clazz, name, clazz, anno.primaryImpl)
+            this.putImpl(clazz, name, clazz, componentAnno.primaryImpl)
             // 注册类为接口的实现（如果有）
-            clazz.interfaces.forEach { this.putImpl(it, name, clazz, anno.primaryImpl) }
+            clazz.interfaces.forEach { this.putImpl(it, name, clazz, componentAnno.primaryImpl) }
             // 注册类为父类的实现（如果有）
             clazz.superclass?.let {
                 var superClass = it
                 while (superClass != Any::class.java) {
-                    this.putImpl(superClass, name, clazz, anno.primaryImpl)
+                    this.putImpl(superClass, name, clazz, componentAnno.primaryImpl)
                     superClass = superClass.getSuperclass()
                 }
             }

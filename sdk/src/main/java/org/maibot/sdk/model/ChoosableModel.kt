@@ -14,9 +14,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @JvmRecord
 data class ChoosableModel(
     @field:JsonProperty(value = "model_name") val modelName: String,
-    @field:JsonProperty(value = "max_retry") val maxRetry: Int?,
-    @field:JsonProperty(value = "temperature") val temperature: Double?,
-    @field:JsonProperty(value = "max_tokens") val maxTokens: Int?,
-    @field:JsonProperty(value = "force_stream_mode") val forceStreamMode: Boolean?,
-    @field:JsonProperty(value = "enable_thinking") val enableThinking: Boolean?
+    @field:JsonProperty(value = "retry_delay_base") val retryDelayBase: Long? = null,
+    @field:JsonProperty(value = "max_retry") val maxRetry: Int? = null,
+    @field:JsonProperty(value = "temperature") val temperature: Double? = null,
+    @field:JsonProperty(value = "max_tokens") val maxTokens: Long? = null,
+    @field:JsonProperty(value = "enable_thinking") val enableThinking: Boolean? = null,
+    @field:JsonProperty(value = "force_stream_mode") val forceStreamMode: Boolean? = null,
 )

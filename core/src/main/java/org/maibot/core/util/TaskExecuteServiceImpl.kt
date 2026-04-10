@@ -1,10 +1,11 @@
 package org.maibot.core.util
 
 import org.maibot.core.modloader.ModManager
-import org.maibot.sdk.TaskExecuteService
+import org.maibot.sdk.task.TaskExecuteService
 import org.maibot.sdk.exceptions.FatalError
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
+import org.maibot.sdk.task.ManagedTask
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.*
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.IntUnaryOperator
 import kotlin.concurrent.Volatile
 import kotlin.system.exitProcess
+
 
 /**
  * 任务执行器服务
@@ -75,11 +77,28 @@ class TaskExecuteServiceImpl
     }
 
     /**
-     * 提交任务到执行器
-     * 
-     * @param task 任务Callable
+     * 提交带有执行上下文的任务，并返回一个Future对象用于获取结果
+     *
      * @param virT 是否使用虚拟线程
+     * @param task 任务ManagedTask
      * @return 任务Future
+     */
+    override fun <T> submit(virT: Boolean, task: ManagedTask<T>): CompletableFuture<T> {
+        task.executor = this
+        if (virT) {
+            this.virtualExecutor.execute(task)
+        } else {
+            this.executor.execute(task)
+        }
+
+        return task.retVal
+    }
+
+    /**
+     * 提交普通任务，并返回一个Future对象用于获取结果
+     *
+     * @param virT 是否使用虚拟线程
+     * @param task 任务Callable
      */
     override fun <T> submit(virT: Boolean, task: () -> T): CompletableFuture<T> {
         val future = CompletableFuture<T>()

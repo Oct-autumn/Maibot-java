@@ -37,7 +37,12 @@ abstract class AbstractMessageEvent(
     /**
      * 将消息转化为提示词字符串
      */
-    abstract fun toPromptString(em: EntityManager): String
+    abstract fun toPromptString(
+        em: EntityManager,
+        interactionEntityManager: InteractionEntityManager,
+        interactionGroupManager: InteractionGroupManager,
+        interactionStreamManager: InteractionStreamManager
+    ): String?
 
     /**
      * 将消息的额外字段转化为数据库存储对象
@@ -96,7 +101,9 @@ abstract class AbstractMessageEvent(
 
         message.timestamp = this.timestamp
         message.sequence = this.serialNo.sNo
-        message.promptStr = this.toPromptString(em)
+        message.promptStr =
+            this.toPromptString(em, interactionEntityManager, interactionGroupManager, interactionStreamManager)
+                ?: "[无法渲染的消息内容]"
         message.objectType = this.objectType
 
         return message

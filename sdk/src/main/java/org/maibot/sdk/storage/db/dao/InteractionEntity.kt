@@ -37,11 +37,13 @@ class InteractionEntity {
     @JoinColumn(name = "person_id", referencedColumnName = "id", nullable = false)
     var person: Person? = null
 
+    @JvmField
     @OneToMany(mappedBy = "sender", cascade = [CascadeType.ALL])
-    val messages: MutableList<Message?>? = null
+    val messages: MutableList<Message>? = null
 
+    @JvmField
     @OneToMany(mappedBy = "entity", cascade = [CascadeType.ALL])
-    val groupMembers: MutableList<GroupMember?>? = null
+    val groupMembers: MutableList<GroupMember>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp

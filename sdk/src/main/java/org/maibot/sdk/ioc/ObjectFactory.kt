@@ -6,4 +6,4 @@ package org.maibot.sdk.ioc
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 @Component(singleton = false)
-annotation class ObjectFactory 
+annotation class ObjectFactory

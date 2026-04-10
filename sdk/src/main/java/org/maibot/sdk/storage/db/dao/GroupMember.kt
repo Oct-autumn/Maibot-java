@@ -10,10 +10,12 @@ import java.util.*
 @Table(name = "group_member")
 @IdClass(GroupMember.GroupMemberId::class)
 class GroupMember {
+    @JvmField
     @Id
     @Column(name = "entity_id")
     var entityId: Long? = null
 
+    @JvmField
     @Id
     @Column(name = "group_id")
     var groupId: Long? = null
@@ -31,7 +33,7 @@ class GroupMember {
     @ManyToOne
     @JoinColumn(name = "group_id", referencedColumnName = "id")
     var group: InteractionGroup? = null
-
+    
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
     var createdAt: Instant? = null
@@ -54,10 +56,10 @@ class GroupMember {
         }
 
         // equals and hashCode methods should be implemented for composite key
-        override fun equals(o: Any?): Boolean {
-            if (this === o) return true
-            if (o !is GroupMemberId) return false
-            return entityId == o.entityId && groupId == o.groupId
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is GroupMemberId) return false
+            return entityId == other.entityId && groupId == other.groupId
         }
     }
 }

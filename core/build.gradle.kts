@@ -35,6 +35,9 @@ dependencies {
     implementation("tools.jackson.dataformat:jackson-dataformat-properties:3.1.0")
     implementation("tools.jackson.module:jackson-module-kotlin:3.1.0")
 
+    // Jackson Schema module for JSON Schema generation
+    implementation("tools.jackson.module:jackson-module-jsonSchema:3.1.0")
+
     // Lombok for reducing boilerplate code
     compileOnly("org.projectlombok:lombok:1.18.44")
     annotationProcessor("org.projectlombok:lombok:1.18.44")

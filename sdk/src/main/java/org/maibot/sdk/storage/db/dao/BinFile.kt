@@ -22,7 +22,7 @@ class BinFile {
     @JvmField
     @Column(name = "file_type")
     var fileType: String? = null
-
+    
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
     var createdAt: Instant? = null

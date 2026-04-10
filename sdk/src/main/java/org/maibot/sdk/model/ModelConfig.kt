@@ -8,6 +8,8 @@ package org.maibot.sdk.model
  * @param apiProvider     API提供商名称，需与配置文件中定义的API提供商名称一致
  * @param priceIn         调用模型的输入价格，单位为元/M-token
  * @param priceOut        调用模型的输出价格，单位为元/M-token
+ * @param timeout         模型调用的超时时间，单位为秒，超过该时间后将放弃调用该模型
+ * @param retryDelayBase  模型调用失败后的重试间隔时间，单位为毫秒，超过该时间后将再次尝试调用该模型
  * @param maxRetry        模型调用失败后的最大重试次数，超过该次数后将放弃调用该模型
  * @param temperature     温度参数，控制生成文本的随机程度，值越大越随机，通常在 0.0 到 1.0 之间
  * @param maxTokens       生成文本的最大长度，单位为 token，超过该长度后模型将停止生成
@@ -21,9 +23,10 @@ data class ModelConfig(
     @JvmField val apiProvider: String,
     @JvmField val priceIn: Double,
     @JvmField val priceOut: Double,
+    @JvmField val retryDelayBase: Long,
     @JvmField val maxRetry: Int,
     @JvmField val temperature: Double,
-    @JvmField val maxTokens: Int,
+    @JvmField val maxTokens: Long,
+    @JvmField val enableThinking: Boolean,
     @JvmField val forceStreamMode: Boolean,
-    @JvmField val enableThinking: Boolean
 )

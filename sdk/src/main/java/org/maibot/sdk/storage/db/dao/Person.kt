@@ -7,6 +7,7 @@ import org.hibernate.annotations.UpdateTimestamp
 @Entity
 @Table(name = "person")
 class Person {
+    @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
@@ -16,8 +17,9 @@ class Person {
     @Column(name = "name", nullable = false)
     var name: String? = null
 
+    @JvmField
     @OneToMany(mappedBy = "person", cascade = [CascadeType.ALL])
-    val interactionEntities: MutableList<InteractionEntity?>? = null
+    val interactionEntities: MutableList<InteractionEntity>? = null
 
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp

@@ -59,6 +59,9 @@ class BinFileManagerImpl : BinFileManager {
                 log.error("获取或创建 BinFile (hash: {}) 时发生异常", hash, e)
                 lockObject.completeExceptionally(e)
                 return null
+            } finally {
+                // 移除锁对象，防止内存泄漏
+                lockMap.remove(hash)
             }
         } else {
             // 其他线程等待锁对象完成
@@ -88,8 +91,12 @@ class BinFileManagerImpl : BinFileManager {
 
     override fun get(em: EntityManager, hash: String): BinFileWithData? {
         try {
-            return em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile::class.java)
-                .apply { setParameter("hash", hash) }.resultList.firstOrNull()?.let { internalGet(it) }
+            val binFile = em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile::class.java)
+                .apply { setParameter("hash", hash) }.resultList.firstOrNull()
+
+            val binFileWithData = binFile?.let { internalGet(it) }
+
+            return binFileWithData
         } catch (e: Exception) {
             log.error("获取 BinFile (hash: {}) 时发生异常", hash, e)
             return null
@@ -110,9 +117,9 @@ class BinFileManagerImpl : BinFileManager {
         try {
             getFile(binFile.fileType!!, binFile.hash!!)?.inputStream()?.use { fileInputStream ->
                 // 核对hash
-                val hash = getSha256Hash(fileInputStream)
+                val fileData = fileInputStream.readAllBytes()
+                val hash = getSha256Hash(fileData)
                 if (hash == binFile.hash) {
-                    val fileData = fileInputStream.readAllBytes()
                     return BinFileWithData(binFile, fileData)
                 } else {
                     log.warn("本地文件 Hash 不匹配 (expected: {}, actual: {})，推测文件已损坏", binFile.hash, hash)

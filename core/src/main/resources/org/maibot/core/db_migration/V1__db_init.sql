@@ -97,6 +97,26 @@ CREATE TABLE IF NOT EXISTS 'bin_file'
     CONSTRAINT 'idx_bin_file_hash_sha256' UNIQUE ('hash_sha256')
 );
 
+---- Index - hash_sha256
+CREATE INDEX IF NOT EXISTS 'idx_bin_file_hash_sha256'
+    ON 'bin_file' ('hash_sha256');
+
+-- ImageDesc Table
+CREATE TABLE IF NOT EXISTS 'image_desc'
+(
+    'id'          INTEGER PRIMARY KEY AUTOINCREMENT,
+    'description' TEXT,
+    'is_emoji'    BOOLEAN NOT NULL,
+    'file_id'     INTEGER NOT NULL,
+    'created_at'  BIGINT  NOT NULL,
+    'updated_at'  BIGINT  NOT NULL,
+    FOREIGN KEY ('file_id') REFERENCES 'bin_file' ('id')
+);
+
+---- Index - file_id
+CREATE INDEX IF NOT EXISTS 'idx_image_desc_file_id'
+    ON 'image_desc' ('file_id');
+
 -- ModelApiRequest Table
 CREATE TABLE IF NOT EXISTS 'model_api_request'
 (

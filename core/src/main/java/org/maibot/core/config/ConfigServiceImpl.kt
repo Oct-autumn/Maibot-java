@@ -16,6 +16,9 @@ import tools.jackson.module.kotlin.KotlinModule
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import java.lang.reflect.TypeVariable
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -275,12 +278,25 @@ class ConfigServiceImpl : ConfigService, InitializableComponent {
     }
 
     @Throws(InvalidConfigPath::class)
-    override fun <T> getConfig(key: String, clazz: Class<T>): T {
+    override fun <T> getConfig(key: String, type: Type): T {
         val rawJson = getRawJson(key)
+
         try {
-            return this.jsonMapper.treeToValue(rawJson, clazz)
+            when (type) {
+                is Class<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    return this.jsonMapper.treeToValue(rawJson, type) as T
+                }
+
+                is ParameterizedType -> {
+                    val javaType = this.jsonMapper.typeFactory.constructType(type)
+                    return this.jsonMapper.convertValue(rawJson, javaType)
+                }
+
+                else -> throw InvalidConfigPath("Unsupported type for config deserialization: %s", type.typeName)
+            }
         } catch (e: JacksonException) {
-            throw InvalidConfigPath("Failed to convert config value to class %s.", clazz.getName(), e)
+            throw InvalidConfigPath("Failed to convert config value to class %s.", type.typeName, e)
         }
     }
 

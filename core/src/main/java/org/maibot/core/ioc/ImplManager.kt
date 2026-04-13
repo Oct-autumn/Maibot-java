@@ -2,13 +2,12 @@ package org.maibot.core.ioc
 
 import io.github.classgraph.ClassGraph
 import io.github.classgraph.ClassGraphException
-import org.maibot.sdk.exceptions.ClassNoImplementation
 import org.maibot.sdk.exceptions.FatalError
+import org.maibot.sdk.exceptions.NoSuchImplOrSubclassException
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.ioc.Specify
 import java.lang.reflect.Modifier
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 
 internal class ImplManager {
     private val implementations = ConcurrentHashMap<Class<*>, ImplMap>()
@@ -112,66 +111,33 @@ internal class ImplManager {
         }
     }
 
-    fun getImpl(interfaceOrClass: Class<*>, name: String = ""): Class<*> {
-        val ret = AtomicReference<Any?>()
-
-        implementations.compute(
-            interfaceOrClass
-        ) { _: Class<*>, implMap: ImplMap? ->
-            if (implMap == null) {
-                // 没有任何实现
-                ret.set(ClassNoImplementation("No implementation found for %s", interfaceOrClass.getName()))
-                return@compute null
-            }
-
-            when (name) {
-                "" -> {
-                    // 没有指定名称
+    fun getImpl(interfaceOrClass: Class<*>, name: String = ""): Class<*>? {
+        return implementations[interfaceOrClass]?.let {
+            if (name.isBlank()) {
+                // 没有指定名称
+                return@let if (it.primary != null) {
                     // 优先返回主实现
+                    it.primary
+                } else if (it.impls.size == 1) {
                     // 没有主实现时，如果只有一个实现，返回它
+                    it.impls.values.iterator().next()
+                } else {
                     // 否则抛出异常，无法确定使用哪个实现
-                    if (implMap.primary != null) {
-                        ret.set(implMap.primary)
-                    } else if (implMap.impls.size == 1) {
-                        ret.set(implMap.impls.values.iterator().next())
-                    } else {
-                        ret.set(
-                            ClassNoImplementation(
-                                "Multiple implementations found for %s, but no primary implementation is defined. Implementations: %s",
-                                interfaceOrClass.getName(),
-                                implMap.impls.keys.joinToString(", ")
-                            )
-                        )
-                    }
+                    throw NoSuchImplOrSubclassException(
+                        "Multiple implementations found for %s, but no primary implementation is defined. Implementations: %s",
+                        interfaceOrClass.getName(),
+                        it.impls.keys.joinToString(", ")
+                    )
                 }
-
-                else -> {
-                    // 指定了名称，查找对应的实现
-                    implMap.impls[name]?.let {
-                        // 返回指定名称的实现
-                        ret.set(it)
-                    } ?: run {
-                        // 没有指定名称的实现
-                        ret.set(
-                            ClassNoImplementation(
-                                "No implementation named '%s' found for %s", name, interfaceOrClass.getName()
-                            )
-                        )
-                    }
+            } else {
+                // 指定了名称，查找对应的实现
+                return@let it.impls[name] ?: run {
+                    // 没有指定名称的实现
+                    throw NoSuchImplOrSubclassException(
+                        "No implementation named '%s' found for %s", name, interfaceOrClass.getName()
+                    )
                 }
             }
-
-            implMap
-        }
-
-        when (val result = ret.get()) {
-            is ClassNoImplementation -> throw result
-            is Class<*> -> return result
-            else -> throw FatalError(
-                "Unexpected error occurred while retrieving implementation for %s with name '%s'",
-                interfaceOrClass.getName(),
-                name
-            )
         }
     }
 

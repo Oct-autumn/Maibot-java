@@ -1,7 +1,8 @@
 package org.maibot.sdk.manager
 
 import jakarta.persistence.EntityManager
-import org.maibot.sdk.storage.db.dao.ImageDescribe
+import org.maibot.sdk.storage.db.dao.BinFile
+import org.maibot.sdk.storage.db.dao.ImageDesc
 import java.util.concurrent.CompletableFuture
 
 interface ImageDescribeManager {
@@ -15,11 +16,9 @@ interface ImageDescribeManager {
      */
     fun getOrCreatIfAbsent(
         em: EntityManager,
-        hash: String,
-        fileType: String,
-        imgData: ByteArray,
+        imgFile: BinFileManager.BinFileWithData,
         isEmoji: Boolean
-    ): ImageDescWithFuture?
+    ): ImageDesc?
 
     /**
      * 根据 BinFile 获取图像描述记录
@@ -28,29 +27,5 @@ interface ImageDescribeManager {
      * @param binFile 图像的二进制文件信息
      * @return 图像描述记录及其描述文本的异步结果(涉及LLM调用)，若不存在则返回 null
      */
-    fun get(em: EntityManager, hash: String): ImageDescWithFuture?
-
-    @JvmRecord
-    data class ImageDescWithFuture(
-        @JvmField val imageDesc: ImageDescribe,
-        @JvmField val descFuture: CompletableFuture<String>?
-    ) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as ImageDescWithFuture
-
-            if (imageDesc != other.imageDesc) return false
-            if (descFuture != other.descFuture) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = imageDesc.hashCode()
-            result = 31 * result + (descFuture?.hashCode() ?: 0)
-            return result
-        }
-    }
+    fun get(em: EntityManager, imgFile: BinFile): ImageDesc?
 }

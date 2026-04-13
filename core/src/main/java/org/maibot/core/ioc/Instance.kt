@@ -1,9 +1,14 @@
 package org.maibot.core.ioc
 
 import org.maibot.sdk.config.ConfigService
-import org.maibot.sdk.exceptions.*
+import org.maibot.sdk.exceptions.CircularDependence
+import org.maibot.sdk.exceptions.InstanceConstructException
+import org.maibot.sdk.exceptions.InvalidConfigPath
+import org.maibot.sdk.exceptions.InvalidValueInjection
 import org.maibot.sdk.ioc.*
 import java.lang.reflect.Constructor
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
 import java.util.function.Supplier
 
 
@@ -15,8 +20,7 @@ object Instance {
     private val singletonManager = SingletonManager()
 
     /** 构造栈，检测循环依赖 */
-    private val constructionStack =
-        ThreadLocal.withInitial(Supplier { HashSet<Class<*>>() })
+    private val constructionStack = ThreadLocal.withInitial(Supplier { HashSet<Class<*>>() })
 
     fun scanImplementations(classLoader: ClassLoader, basePackage: String = "") {
         implManager.scanImplementations(classLoader, basePackage)
@@ -33,17 +37,14 @@ object Instance {
         val stack = constructionStack.get()
         if (stack.contains(clazz)) {
             throw CircularDependence(
-                "Circular dependency detected while creating instance of Class %s",
-                clazz.getName()
+                "Circular dependency detected while creating instance of Class %s", clazz.getName()
             )
         }
         // 标记正在构造该类的实例
         stack.add(clazz)
 
         try {
-            if ((clazz.isAnnotationPresent(Component::class.java)
-                        && clazz.getAnnotation(Component::class.java).singleton)
-            ) {
+            if ((clazz.isAnnotationPresent(Component::class.java) && clazz.getAnnotation(Component::class.java).singleton)) {
                 // 对于单例，通过单例管理器获取
                 return singletonManager.getSingletonInstance(clazz)
             } else {
@@ -77,13 +78,9 @@ object Instance {
      * @return 接口或类的指定实现的实例
     </T> */
     fun <T> get(interfaceOrClass: Class<T>, name: String = ""): T {
-        try {
-            val implClass = implManager.getImpl(interfaceOrClass, name)
-            return interfaceOrClass.cast(getInst(implClass))
-        } catch (_: ClassNoImplementation) {
-            // 未托管的类，尝试直接创建实例
-            return getInst(interfaceOrClass)
-        }
+        val implClass = implManager.getImpl(interfaceOrClass, name)
+
+        return interfaceOrClass.cast(getInst(implClass ?: interfaceOrClass))
     }
 
     /**
@@ -113,9 +110,7 @@ object Instance {
                 instance = getFromAutoConstructor(autoConstructor)
             } catch (e: Exception) {
                 throw InstanceConstructException(
-                    "Failed to create instance using @AutoInject constructor for class %s",
-                    clazz.getName(),
-                    e
+                    "Failed to create instance using @AutoInject constructor for class %s", clazz.getName(), e
                 )
             }
         } else if (zeroConstructor != null) {
@@ -125,9 +120,7 @@ object Instance {
                 instance = zeroConstructor.newInstance()
             } catch (e: Exception) {
                 throw InstanceConstructException(
-                    "Failed to create instance using zero-arg constructor for class %s",
-                    clazz.getName(),
-                    e
+                    "Failed to create instance using zero-arg constructor for class %s", clazz.getName(), e
                 )
             }
         } else {
@@ -156,14 +149,14 @@ object Instance {
             if (param.isAnnotationPresent(Value::class.java)) {
                 // 配置文件注入或直接值注入
                 val value = param.getAnnotation(Value::class.java).value
-                params[idx] = getValue(value, param.getType())
-            } else if (param.isAnnotationPresent(Specify::class.java)) {
-                // 指定实现
-                val implClassName = param.getAnnotation(Specify::class.java).name
-                params[idx] = getInst(implManager.getImpl(param.getType(), implClassName))
+                params[idx] = getValue(value, param.parameterizedType)
             } else {
-                // 普通类型注入
-                params[idx] = getInst(implManager.getImpl(param.getType()))
+                val interfaceOrClass = param.getType()
+                val implClassName = param.getAnnotation(Specify::class.java)?.name ?: ""
+                val implClass = implManager.getImpl(interfaceOrClass, implClassName)
+
+                // 注入实现
+                params[idx] = getInst(implClass ?: interfaceOrClass)
             }
         }
 
@@ -179,19 +172,21 @@ object Instance {
      * @return 字段值
      * @throws InvalidConfigPath 如果配置路径无效
      */
-    private fun <T> getValue(value: String, valueType: Class<T>): T {
+    private fun <T> getValue(value: String, valueType: Type): T {
         if (value.startsWith($$"${") && value.endsWith("}")) {
             // 符合格式的配置项，从配置文件中读取
             val confMgr = get(ConfigService::class.java)
             val path = value.substring(2, value.length - 1)
+
             return confMgr.getConfig(path, valueType)
         }
 
         try {
             // 其他情况，尝试直接转换
-            return valueType.cast(value)
+            @Suppress("UNCHECKED_CAST")
+            return valueType.javaClass.cast(value) as T
         } catch (e: ClassCastException) {
-            throw InvalidValueInjection("Cannot inject value '%s' as type %s", value, valueType.getName(), e)
+            throw InvalidValueInjection("Cannot inject value '%s' as type %s", value, valueType.typeName, e)
         }
     }
 

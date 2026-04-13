@@ -2,6 +2,8 @@ package org.maibot.sdk.config
 
 import org.maibot.sdk.exceptions.InvalidConfigPath
 import tools.jackson.databind.JsonNode
+import java.lang.reflect.Type
+import java.lang.reflect.TypeVariable
 
 /**
  * 配置服务接口
@@ -30,5 +32,5 @@ interface ConfigService {
      * @throws InvalidConfigPath 如果配置路径无效
      */
     @Throws(InvalidConfigPath::class)
-    fun <T> getConfig(key: String, clazz: Class<T>): T
+    fun <T> getConfig(key: String, type: Type): T
 }

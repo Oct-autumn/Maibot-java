@@ -56,7 +56,7 @@ class MaibotMain
         // <!-- 从此处开始可以正常使用来自IoC的线程池 -->
 
         val terminalFuture = start(
-            "启动用时：{}ms"
+            "Core启动用时：{}ms"
         ) {
             log.info("正在启动思维流...")
             this.thinkingFlowManager.initialize()
@@ -70,8 +70,12 @@ class MaibotMain
             this.taskExecutorService.submit(false) { this.terminalController.runCommandline() }
         }
 
-        // 启用Mod
-        this.modManager.enableMods()
+        start(
+            "启用Mod用时：{}ms"
+        ) {
+            // 启用Mod
+            this.modManager.enableMods()
+        }
 
         // 阻塞调用，直到终端退出
         terminalFuture.join()

@@ -103,6 +103,23 @@ tasks.named("publishToMavenLocal") {
         if (!targetDir.exists()) {
             targetDir.mkdirs()
         }
+
+        // Compare source and target files, only copy if they are different to avoid unnecessary file operations
+        if (targetFile.exists()) {
+            val sourceHash =
+                MessageDigest.getInstance("SHA-256")
+                    .digest(sourceFile.readBytes())
+                    .joinToString("") { "%02x".format(it) }
+            val targetHash =
+                MessageDigest.getInstance("SHA-256")
+                    .digest(targetFile.readBytes())
+                    .joinToString("") { "%02x".format(it) }
+            if (sourceHash == targetHash) {
+                println("Target file is identical to source file, SKIPPED")
+                return@doLast
+            }
+        }
+
         sourceFile.copyTo(targetFile, overwrite = true)
     }
 }

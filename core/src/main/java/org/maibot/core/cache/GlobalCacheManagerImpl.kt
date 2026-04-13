@@ -68,7 +68,7 @@ class GlobalCacheManagerImpl private constructor() : DestroyableComponent, Globa
         return this.globalCache
     }
 
-    override fun <K, V> createCache(
+    override fun <K, V> createCacheIfAbsent(
         cacheName: String,
         keyType: Class<K>,
         valueType: Class<V>,
@@ -77,6 +77,11 @@ class GlobalCacheManagerImpl private constructor() : DestroyableComponent, Globa
         diskMB: Int,
         ttl: Duration?
     ): Cache<K, V> {
+        if (this.jCacheManager.cacheNames.contains(cacheName)) {
+            return this.jCacheManager.getCache(cacheName, keyType, valueType)
+                ?: throw RuntimeException("Cache with name '$cacheName' already exists but has incompatible key/value types")
+        }
+
         require(heapEntries > 0) { "heapEntries must be greater than 0" }
         require(offHeapMB >= 0) { "offHeapMB must be non-negative, if you don't want off-heap storage, set it to 0" }
         require(diskMB >= 0) { "diskMB must be non-negative, if you don't want disk storage, set it to 0" }

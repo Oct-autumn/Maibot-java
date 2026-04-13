@@ -1,5 +1,7 @@
 package org.maibot.sdk.model
 
+import org.maibot.sdk.config.ChoosableModel
+
 abstract class ModelManager {
     protected abstract fun registerRequestTask(taskName: String, choosableModels: List<ChoosableModel>)
 

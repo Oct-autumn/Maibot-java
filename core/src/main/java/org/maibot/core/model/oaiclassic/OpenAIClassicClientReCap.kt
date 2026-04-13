@@ -35,10 +35,10 @@ class OpenAIClassicClientReCap : ModelClientBase {
         connectTimeout: Long,
     ) : super(baseURL, apiKey, connectTimeout) {
         val timeoutConfig = Timeout.builder()
-            .connect(Duration.ofMillis(connectTimeout))
-            .read(Duration.ofMillis(connectTimeout))
-            .write(Duration.ofMillis(connectTimeout))
-            .request(Duration.ofMillis(0))  // 请求超时设置为0，不限制整个请求的总耗时
+            .connect(Duration.ofSeconds(connectTimeout))
+            .read(Duration.ofSeconds(connectTimeout))
+            .write(Duration.ofSeconds(connectTimeout))
+            .request(Duration.ZERO)  // 请求超时设置为0，不限制整个请求的总耗时
             .build()
 
         client = OpenAIOkHttpClient.builder()
@@ -83,7 +83,8 @@ class OpenAIClassicClientReCap : ModelClientBase {
 
         for (attempt in 0..maxRetry) {
             try {
-                val resp = client.chat().completions().create(params).validate()
+                val resp = client.chat().completions().create(params)
+                resp.validate()
                 // 提取响应内容并封装成APIResponse对象
                 return toAPIResponse(resp)
             } catch (e: Exception) {

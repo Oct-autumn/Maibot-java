@@ -7,11 +7,12 @@ import java.time.Instant
 
 @Entity
 @Table(
-    name = "image_describe", indexes = [Index(name = "idx_message_timestamp", columnList = "timestamp"), Index(
-        name = "idx_message_stream", columnList = "stream_id"
-    )]
+    name = "image_desc",
+    indexes = [
+        Index(name = "idx_image_desc_file_id", columnList = "file_id")
+    ]
 )
-class ImageDescribe {
+class ImageDesc {
     @JvmField
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

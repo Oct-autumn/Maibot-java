@@ -2,6 +2,7 @@ package org.maibot.core.model
 
 import org.maibot.core.ioc.Instance
 import org.maibot.core.util.TaskExecuteServiceImpl
+import org.maibot.sdk.config.ChoosableModel
 import org.maibot.sdk.config.ModelApiConfig
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
@@ -12,7 +13,7 @@ import org.maibot.sdk.model.*
 @Component
 class ModelManagerImpl
 @AutoInject private constructor(
-    @Value("choosableModels:*") config: ModelApiConfig,
+    @Value($$"${choosableModels:*}") config: ModelApiConfig,
     private val taskExecuteService: TaskExecuteServiceImpl
 ) : ModelManager() {
     /** API提供者名称与客户端实例的映射 */

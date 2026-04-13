@@ -1,6 +1,7 @@
 package org.maibot.core.config
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import org.maibot.sdk.config.ChoosableModel
 
 /*
  * 主配置类，映射 config.toml 文件结构
@@ -14,7 +15,11 @@ data class CoreConfig(
     @field:JsonProperty(value = "bot_info", required = true) val botInfo: BotInfo,
     @field:JsonProperty(value = "log") val log: Log = Log(),
     @field:JsonProperty(value = "network", required = true) val network: Network,
-    @field:JsonProperty(value = "thinking") val thinking: Thinking = Thinking()
+    @field:JsonProperty(
+        value = "model_tasks",
+        required = true
+    ) val modelTasks: Map<String, List<ChoosableModel>> = mapOf(),
+    @field:JsonProperty(value = "thinking") val thinking: Thinking = Thinking(),
 ) {
     data class BotInfo(
         @field:JsonProperty(value = "name", required = true) val name: String,

@@ -33,7 +33,7 @@ class GroupMember {
     @ManyToOne
     @JoinColumn(name = "group_id", referencedColumnName = "id")
     var group: InteractionGroup? = null
-    
+
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
     var createdAt: Instant? = null
@@ -42,17 +42,17 @@ class GroupMember {
     @UpdateTimestamp
     var updatedAt: Instant? = null
 
-    class GroupMemberId {
+    class GroupMemberId() {
         private var groupId: Long? = null
         private var entityId: Long? = null
 
-        constructor(groupId: Long, entityId: Long) {
+        constructor(groupId: Long, entityId: Long) : this() {
             this.groupId = groupId
             this.entityId = entityId
         }
 
         override fun hashCode(): Int {
-            return Objects.hash(groupId, entityId)
+            return (groupId?.hashCode() ?: 0) * 31 + (entityId?.hashCode() ?: 0)
         }
 
         // equals and hashCode methods should be implemented for composite key

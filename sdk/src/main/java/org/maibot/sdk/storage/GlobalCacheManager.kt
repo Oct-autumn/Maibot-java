@@ -22,7 +22,7 @@ interface GlobalCacheManager {
      * @param diskMB      磁盘缓存大小（MB），0表示不使用磁盘缓存
      * @return 缓存实例
      */
-    fun <K, V> createCache(
+    fun <K, V> createCacheIfAbsent(
         cacheName: String,
         keyType: Class<K>,
         valueType: Class<V>,

@@ -5,4 +5,5 @@ package org.maibot.sdk.ioc
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CONSTRUCTOR)
+@Suppress("unused")
 annotation class AutoInject 

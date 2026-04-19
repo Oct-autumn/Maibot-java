@@ -12,11 +12,11 @@ import com.openai.models.chat.completions.*
 import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam.Content.ChatCompletionRequestAssistantMessageContentPart
 import org.maibot.sdk.exceptions.FatalError
 import org.maibot.sdk.exceptions.ModelRequestFailed
-import org.maibot.sdk.jackson.ObjectMapper
 import org.maibot.sdk.model.APIResponse
 import org.maibot.sdk.model.ModelClientBase
 import org.maibot.sdk.model.payload.AvailableFunctionItem
 import org.maibot.sdk.model.payload.MessageContextItem
+import org.maibot.sdk.util.MapperUtils
 import org.slf4j.LoggerFactory.getLogger
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
@@ -340,11 +340,10 @@ class OpenAIClassicClientReCap : ModelClientBase {
 
         val toolCalls = choice.message().toolCalls().getOrNull()?.mapNotNull { toolCall ->
             val functionCall = toolCall.function().getOrNull() ?: return@mapNotNull null
-
-            val mapper = ObjectMapper()
+            
             // 解析Args
             val args = functionCall.function().arguments()
-            val argJsonNode = mapper.readTree(args)
+            val argJsonNode = MapperUtils.jsonMapper.readTree(args)
 
 
 

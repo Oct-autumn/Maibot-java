@@ -3,6 +3,7 @@ package org.maibot.core.manager
 import jakarta.persistence.EntityManager
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.InteractionStreamManager
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.InteractionEntity
 import org.maibot.sdk.storage.db.dao.InteractionGroup
 import org.maibot.sdk.storage.db.dao.InteractionStream
@@ -61,11 +62,15 @@ class InteractionStreamManagerImpl : InteractionStreamManager {
                             setParameter("entityId", interactionEntity!!.id)
                         }
 
-                        stream = query.resultList.firstOrNull() ?: InteractionStream().apply { // 不存在则创建新实例
-                            this.id = idGen(StreamType.PRIVATE, interactionEntity!!.id!!)
-                            this.type = StreamType.PRIVATE
-                            this.entity = interactionEntity
-                            em.persist(this)
+                        stream = query.resultList.firstOrNull() ?: run { // 不存在则创建新实例
+                            DatabaseService.execInTransaction(em) {
+                                InteractionStream().apply {
+                                    this.id = idGen(StreamType.PRIVATE, interactionEntity!!.id!!)
+                                    this.type = StreamType.PRIVATE
+                                    this.entity = interactionEntity
+                                    em.persist(this)
+                                }
+                            }
                         }
                     }
 
@@ -79,11 +84,15 @@ class InteractionStreamManagerImpl : InteractionStreamManager {
                             setParameter("groupId", interactionGroup!!.id)
                         }
 
-                        stream = query.resultList.firstOrNull() ?: InteractionStream().apply { // 不存在则创建新实例
-                            this.id = idGen(StreamType.GROUP, interactionGroup!!.id!!)
-                            this.type = StreamType.GROUP
-                            this.group = interactionGroup
-                            em.persist(this)
+                        stream = query.resultList.firstOrNull() ?: run { // 不存在则创建新实例
+                            DatabaseService.execInTransaction(em) {
+                                InteractionStream().apply {
+                                    this.id = idGen(StreamType.GROUP, interactionGroup!!.id!!)
+                                    this.type = StreamType.GROUP
+                                    this.group = interactionGroup
+                                    em.persist(this)
+                                }
+                            }
                         }
                     }
                 }

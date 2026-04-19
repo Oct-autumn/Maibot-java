@@ -22,7 +22,7 @@ class ImageDesc {
      * 图像内容描述
      */
     @JvmField
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     var description: String? = null
 
     /**

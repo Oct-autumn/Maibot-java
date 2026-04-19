@@ -6,7 +6,7 @@ import org.maibot.sdk.model.ModelClientBase
 import org.maibot.sdk.model.ModelClientFactory
 
 @ObjectFactory
-@Specify(name = "OpenAIClassic")
+@Specify("OpenAIClassic")
 class OpenAIClassicClientReCapFactory : ModelClientFactory {
     var baseURL: String = ""
         private set

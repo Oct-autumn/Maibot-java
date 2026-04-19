@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS 'idx_bin_file_hash_sha256'
 CREATE TABLE IF NOT EXISTS 'image_desc'
 (
     'id'          INTEGER PRIMARY KEY AUTOINCREMENT,
-    'description' TEXT,
+    'description' TEXT    NOT NULL,
     'is_emoji'    BOOLEAN NOT NULL,
     'file_id'     INTEGER NOT NULL,
     'created_at'  BIGINT  NOT NULL,

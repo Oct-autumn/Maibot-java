@@ -54,7 +54,7 @@ internal class ImplManager {
                 ?: clazz.annotations.map { it.annotationClass.java.getAnnotation(Component::class.java) }
                     .filterNotNull().firstOrNull()!!    // 获取 @Component 注解（同样支持元注解）
 
-            val name = specifyAnno?.name ?: clazz.simpleName
+            val name = specifyAnno?.value ?: clazz.simpleName
 
             // 注册类为自身的实现
             this.putImpl(clazz, name, clazz, componentAnno.primaryImpl)

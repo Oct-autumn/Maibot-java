@@ -29,12 +29,11 @@ abstract class SimpleEventHandler<T> : ChannelInboundHandlerAdapter {
             @Suppress("UNCHECKED_CAST")
             val typedEvt = evt as T
 
-            if (handleEvent(ctx, typedEvt)) {
-                super.userEventTriggered(ctx, evt)
+            if (!handleEvent(ctx, typedEvt)) {
+                return
             }
-        } else {
-            ctx.fireUserEventTriggered(evt)
         }
+        ctx.fireUserEventTriggered(evt)
     }
 
     /**
@@ -42,7 +41,7 @@ abstract class SimpleEventHandler<T> : ChannelInboundHandlerAdapter {
      * 
      * @param ctx 处理上下文
      * @param evt 事件对象
-     * @return 是否不需要重新触发事件，返回 true 则表示不需要重新触发，返回 false 则表示需要重新触发
+     * @return 是否要继续传递事件（true 继续传递，false 停止传递）
      */
     @Throws(Exception::class)
     protected abstract fun handleEvent(ctx: ChannelHandlerContext, evt: T): Boolean

@@ -26,7 +26,14 @@ Maibot 的 Kotlin 重构版，推倒全部代码，重新设计，使用 Kotlin 
 - `launcher`：启动器，负责启动和管理 Maibot-JE 实例。
 - `core`：核心模块，包含 Maibot 的主要逻辑和功能；
 - `sdk`：SDK，为第三方开发者提供接口；
-- `example_mods`：示例模组，展示如何使用 SDK 开发模组。
+
+## TODO
+
+- [ ] 消息持久化系统
+    - [x] 消息序列化
+    - [ ] 消息反序列化
+- [ ] 事件系统
+- [ ] 模组系统
 
 ## 开源协议（License）
 

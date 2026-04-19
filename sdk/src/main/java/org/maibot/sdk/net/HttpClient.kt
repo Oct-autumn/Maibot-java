@@ -7,6 +7,7 @@ import java.net.URL
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicReference
 
+// TODO: IOC 重启不安全，需要重构
 object HttpClient {
     private val PROVIDER = AtomicReference<HttpClientProvider?>()
 

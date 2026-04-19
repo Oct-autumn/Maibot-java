@@ -3,6 +3,7 @@ package org.maibot.core.manager
 import jakarta.persistence.EntityManager
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.InteractionEntityManager
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.InteractionEntity
 import org.maibot.sdk.storage.db.dao.Person
 import org.slf4j.Logger
@@ -36,17 +37,19 @@ class InteractionEntityManagerImpl : InteractionEntityManager {
                 // 检查实体是否存在，防止重复创建
                 val entity = this.get(em, platform, platformUserId) ?: run { // 不存在则创建新实例
                     // 先创建Person实体
-                    val person = Person().apply {
-                        name = nickname
-                        em.persist(this)
-                    }
-                    // 再创建InteractionEntity实体
-                    InteractionEntity().apply {
-                        this.platform = platform
-                        this.platformUserId = platformUserId
-                        this.person = person
-                        this.nickname = nickname
-                        em.persist(this)
+                    DatabaseService.execInTransaction(em) {
+                        val person = Person().apply {
+                            name = nickname
+                            em.persist(this)
+                        }
+                        // 再创建InteractionEntity实体
+                        InteractionEntity().apply {
+                            this.platform = platform
+                            this.platformUserId = platformUserId
+                            this.person = person
+                            this.nickname = nickname
+                            em.persist(this)
+                        }
                     }
                 }
 

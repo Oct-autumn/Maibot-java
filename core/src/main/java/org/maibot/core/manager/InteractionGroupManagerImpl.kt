@@ -3,6 +3,7 @@ package org.maibot.core.manager
 import jakarta.persistence.EntityManager
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.InteractionGroupManager
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.InteractionGroup
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -12,18 +13,14 @@ import java.util.concurrent.ConcurrentHashMap
 @Component
 class InteractionGroupManagerImpl : InteractionGroupManager {
     // 锁对象映射，用于防止 交互实体 的重复创建
-    private val lockMap =
-        ConcurrentHashMap<String, CompletableFuture<InteractionGroup>>()
+    private val lockMap = ConcurrentHashMap<String, CompletableFuture<InteractionGroup>>()
 
     private fun generateKey(platform: String, platformGroupId: String): String {
         return "$platform:$platformGroupId"
     }
 
     override fun getOrCreatIfAbsent(
-        em: EntityManager,
-        platform: String,
-        platformGroupId: String,
-        groupName: String?
+        em: EntityManager, platform: String, platformGroupId: String, groupName: String?
     ): InteractionGroup? {
         val key = generateKey(platform, platformGroupId)
         // 使用锁对象，防止重复查询和创建
@@ -34,11 +31,15 @@ class InteractionGroupManagerImpl : InteractionGroupManager {
             // 当前线程获得锁，执行获取或创建逻辑
             try {
                 // 检查实体是否存在
-                val group = this.get(em, platform, platformGroupId) ?: InteractionGroup().apply { // 不存在则创建新实例
-                    this.platform = platform
-                    this.platformGroupId = platformGroupId
-                    this.groupName = groupName
-                    em.persist(this)
+                val group = this.get(em, platform, platformGroupId) ?: run { // 不存在则创建新实例
+                    DatabaseService.execInTransaction(em) {
+                        InteractionGroup().apply {
+                            this.platform = platform
+                            this.platformGroupId = platformGroupId
+                            this.groupName = groupName
+                            em.persist(this)
+                        }
+                    }
                 }
 
                 // 完成锁对象，通知等待的线程

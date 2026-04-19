@@ -10,7 +10,6 @@ import org.flywaydb.core.api.FlywayException
 import org.flywaydb.core.api.exception.FlywayValidateException
 import org.hibernate.jpa.HibernatePersistenceProvider
 import org.maibot.core.cache.GlobalCacheManagerImpl
-import org.maibot.core.util.TaskExecuteServiceImpl
 import org.maibot.sdk.exceptions.DbOperationException
 import org.maibot.sdk.exceptions.FatalError
 import org.maibot.sdk.exceptions.NotInitialized
@@ -20,14 +19,16 @@ import org.maibot.sdk.ioc.DestroyableComponent
 import org.maibot.sdk.storage.db.DatabaseService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import java.io.IOException
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
+import java.util.*
 
 @Component
 class DatabaseServiceImpl
-@AutoInject private constructor(
-    private val taskExecutorService: TaskExecuteServiceImpl, globalCacheManager: GlobalCacheManagerImpl
+@AutoInject
+private constructor(
+    globalCacheManager: GlobalCacheManagerImpl
 ) : DestroyableComponent, DatabaseService {
     private var entityManagerFactory: EntityManagerFactory? = null
 
@@ -110,21 +111,15 @@ class DatabaseServiceImpl
     override fun <T> exec(func: (em: EntityManager) -> T): T {
         return this.entityManagerFactory?.createEntityManager()?.use { em ->
             try {
-                em.transaction.begin()
+                MDC.put("db-em-id", em.hashCode().toHexString())
                 val res = em.run(func)
-                em.transaction.commit()
                 return@use res
             } catch (e: Throwable) {
-                if (em.transaction.isActive) {
-                    em.transaction.rollback()
-                }
                 throw DbOperationException("Database operation failed", e)
+            } finally {
+                MDC.remove("db-em-id")
             }
         } ?: throw NotInitialized("DatabaseService is not initialized. Please call init() before using it.")
-    }
-
-    override fun <T> execAsync(func: (em: EntityManager) -> T): CompletableFuture<T> {
-        return this.taskExecutorService.submit(false) { exec(func) }
     }
 
     /**

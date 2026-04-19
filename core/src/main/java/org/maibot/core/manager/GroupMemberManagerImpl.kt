@@ -3,6 +3,7 @@ package org.maibot.core.manager
 import jakarta.persistence.EntityManager
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.GroupMemberManager
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.GroupMember
 import org.maibot.sdk.storage.db.dao.GroupMember.GroupMemberId
 import org.maibot.sdk.storage.db.dao.InteractionEntity
@@ -33,11 +34,15 @@ class GroupMemberManagerImpl : GroupMemberManager {
             // 当前线程获得锁，执行获取或创建逻辑
             try {
                 // 检查实体是否存在，防止重复创建
-                val groupMember = this.get(em, group, entity) ?: GroupMember().apply { // 不存在则创建新实例
-                    this.group = group
-                    this.entity = entity
-                    this.cardName = cardName
-                    em.persist(this)
+                val groupMember = this.get(em, group, entity) ?: run { // 不存在则创建新实例
+                    DatabaseService.execInTransaction(em) {
+                        GroupMember().apply {
+                            this.group = group
+                            this.entity = entity
+                            this.cardName = cardName
+                            em.merge(this)
+                        }
+                    }
                 }
 
                 // 完成锁对象，通知等待的线程

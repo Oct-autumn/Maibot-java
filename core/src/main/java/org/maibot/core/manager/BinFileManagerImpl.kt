@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.BinFileManager
 import org.maibot.sdk.manager.BinFileManager.BinFileWithData
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.BinFile
 import org.maibot.sdk.util.HashUtils.getSha256Hash
 import org.maibot.sdk.util.LocalBinFileUtils.getFile
@@ -35,12 +36,13 @@ class BinFileManagerImpl : BinFileManager {
                 // 检查实体是否存在，防止重复创建
                 val binFileWithData = (this.get(em, hash) ?: run { // 不存在则创建新实体
                     saveFile(fileType, hash, binData)
-
-                    BinFile().run {
-                        this.hash = hash
-                        this.fileType = fileType
-                        em.persist(this)
-                        BinFileWithData(this, binData)
+                    DatabaseService.execInTransaction(em) {
+                        BinFile().run {
+                            this.hash = hash
+                            this.fileType = fileType
+                            em.merge(this)
+                            BinFileWithData(this, binData)
+                        }
                     }
                 }).run {
                     if (data != null) {
@@ -66,7 +68,9 @@ class BinFileManagerImpl : BinFileManager {
         } else {
             // 其他线程等待锁对象完成
             try {
-                return mappedLock.get()
+                val res = mappedLock.get()
+                em.merge(res.binFile)
+                return res
             } catch (e: Exception) {
                 log.error("等待获取 BinFile (hash: {}) 时发生异常", hash, e)
                 return null
@@ -80,7 +84,7 @@ class BinFileManagerImpl : BinFileManager {
                 val hash = getSha256Hash(binStream)
                 saveFile(binFile.fileType!!, hash, binData)
                 binFile.hash = hash
-                em.merge(binFile)
+                DatabaseService.execInTransaction(em) { em.merge(binFile) }
                 return BinFileWithData(binFile, binData)
             }
         } catch (e: Exception) {
@@ -91,8 +95,9 @@ class BinFileManagerImpl : BinFileManager {
 
     override fun get(em: EntityManager, hash: String): BinFileWithData? {
         try {
-            val binFile = em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile::class.java)
-                .apply { setParameter("hash", hash) }.resultList.firstOrNull()
+            val binFile =
+                em.createQuery("SELECT b FROM BinFile b WHERE b.hash = :hash", BinFile::class.java)
+                    .apply { setParameter("hash", hash) }.resultList.firstOrNull()
 
             val binFileWithData = binFile?.let { internalGet(it) }
 

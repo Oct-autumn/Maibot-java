@@ -9,7 +9,6 @@ import org.maibot.sdk.model.executors.ImageDescGenerator
 import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.BinFile
 import org.maibot.sdk.storage.db.dao.ImageDesc
-import org.maibot.sdk.task.TaskExecuteService
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -46,6 +45,11 @@ private constructor(
             // 当前线程获得锁，执行获取或创建逻辑
             try {
                 val imageDesc = (this.get(em, imgFile.binFile) ?: run {
+                    if (imgFile.data == null) {
+                        log.warn("图像数据缺失，无法生成描述 (binFileHash: {})", hash)
+                        return null
+                    }
+
                     // 不存在，先获取desc，然后创建新实体
                     val desc =
                         imageDescGenerator.generateImageDescription(imgFile.data!!, imgFile.binFile.fileType!!, isEmoji)
@@ -55,16 +59,19 @@ private constructor(
                         return null
                     }
 
-                    ImageDesc().apply {
-                        this.binFile = imgFile.binFile
-                        this.isEmoji = isEmoji
-                        this.description = desc
-                        em.persist(this)
+                    DatabaseService.execInTransaction(em) {
+                        ImageDesc().apply {
+                            this.binFile = imgFile.binFile
+                            this.isEmoji = isEmoji
+                            this.description = desc
+                            em.merge(this)
+                        }
                     }
                 })
 
                 // 完成锁对象，通知等待的线程
                 lockObject.complete(imageDesc)
+                log.trace("成功获取或创建 ImageDescribe (binFileHash: {})", hash)
                 return imageDesc
             } catch (e: Exception) {
                 log.error("获取或创建 ImageDescribe (binFileHash: {}) 时发生异常", hash, e)
@@ -76,8 +83,11 @@ private constructor(
             }
         } else {
             // 其他线程已经在处理该图像描述的获取或创建，等待结果
+            log.trace("等待获取 ImageDescribe 结果 (binFileHash: {})", hash)
             try {
-                return mappedLock.get()
+                val imageDesc = mappedLock.get()
+                em.merge(imageDesc) // 将imageDesc注册到本地EntityManager上下文中
+                return imageDesc
             } catch (e: Exception) {
                 log.error("等待获取 ImageDescribe (binFileHash: {}) 结果时发生异常", hash, e)
                 return null

@@ -3,13 +3,13 @@ package org.maibot.sdk.storage.model.msgevt
 import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.persistence.EntityManager
 import org.maibot.sdk.SNoGenerator
+import org.maibot.sdk.ioc.IOC
 import org.maibot.sdk.manager.InteractionEntityManager
 import org.maibot.sdk.manager.InteractionGroupManager
 import org.maibot.sdk.manager.InteractionStreamManager
 import org.maibot.sdk.storage.db.dao.Message
 import org.maibot.sdk.storage.domain.StreamType
 import org.maibot.sdk.util.UnwrapUtils.unwrap
-import tools.jackson.databind.ObjectMapper
 
 /**
  * 抽象消息事件接口，定义了将消息转化为提示词字符串和数据库存储对象的方法
@@ -39,9 +39,7 @@ abstract class AbstractMessageEvent(
      */
     abstract fun toPromptString(
         em: EntityManager,
-        interactionEntityManager: InteractionEntityManager,
-        interactionGroupManager: InteractionGroupManager,
-        interactionStreamManager: InteractionStreamManager
+        ioc: IOC
     ): String?
 
     /**
@@ -57,7 +55,8 @@ abstract class AbstractMessageEvent(
         em: EntityManager,
         interactionEntityManager: InteractionEntityManager,
         interactionGroupManager: InteractionGroupManager,
-        interactionStreamManager: InteractionStreamManager
+        interactionStreamManager: InteractionStreamManager,
+        ioc: IOC
     ): Message {
         val message = Message()
 
@@ -102,9 +101,11 @@ abstract class AbstractMessageEvent(
         message.timestamp = this.timestamp
         message.sequence = this.serialNo.sNo
         message.promptStr =
-            this.toPromptString(em, interactionEntityManager, interactionGroupManager, interactionStreamManager)
-                ?: "[无法渲染的消息内容]"
+            this.toPromptString(em, ioc)
+                ?: "[消息内容渲染失败]"  // 如果消息内容无法渲染为提示词字符串，则使用默认提示
         message.objectType = this.objectType
+
+        message.rawContentJson = this.toRawContentJson()
 
         return message
     }
@@ -118,7 +119,7 @@ abstract class AbstractMessageEvent(
      * 
      * @return 类型特定内容的 JSON 字符串
      */
-    protected abstract fun toRawContentJson(objectMapper: ObjectMapper): String
+    protected abstract fun toRawContentJson(): String
 
     override fun toString(): String {
         return "AbstractMessageEvent[messageSource=$messageMeta, timestamp=$timestamp, sequence=$serialNo]"

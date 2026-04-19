@@ -7,7 +7,6 @@ import org.maibot.sdk.exceptions.InvalidConfigPath
 import org.maibot.sdk.exceptions.InvalidValueInjection
 import org.maibot.sdk.ioc.*
 import java.lang.reflect.Constructor
-import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.function.Supplier
 
@@ -152,7 +151,7 @@ object Instance {
                 params[idx] = getValue(value, param.parameterizedType)
             } else {
                 val interfaceOrClass = param.getType()
-                val implClassName = param.getAnnotation(Specify::class.java)?.name ?: ""
+                val implClassName = param.getAnnotation(Specify::class.java)?.value ?: ""
                 val implClass = implManager.getImpl(interfaceOrClass, implClassName)
 
                 // 注入实现

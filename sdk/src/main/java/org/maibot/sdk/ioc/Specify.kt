@@ -7,5 +7,5 @@ package org.maibot.sdk.ioc
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.CLASS)
-annotation class Specify(val name: String)
+annotation class Specify(val value: String)
 

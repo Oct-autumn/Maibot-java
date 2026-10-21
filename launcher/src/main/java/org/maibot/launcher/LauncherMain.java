@@ -29,6 +29,7 @@ import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.graph.DefaultDependencyNode;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.graph.DependencyNode;
+import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyRequest;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.resolution.DependencyResult;
@@ -152,33 +153,137 @@ public class LauncherMain {
 
         var artifactResults = dependencyResult.getArtifactResults();
 
-        var artifactUrlSet = new HashSet<URL>(artifactResults.size());
+        // 读取 Core JAR 中声明的直接依赖版本：出现多版本冲突时优先采用 Core 的版本，
+        // 保证运行时依赖与 Core 编译期使用的版本一致
+        // （历史问题：Adapter 声明了旧版 Netty，classpath 里两个版本共存，导致网络服务启动静默失败）
+        var preferredVersions = readImplDeps(coreJar);
+
+        // 按 groupId:artifactId 去重。
+        // 注意：同一坐标的不同版本是不同 URL，仅靠 Set<URL> 去重不够，必须显式按坐标取舍；
+        // 否则 classpath 会混入多个版本，且顺序取决于 URL 哈希（即仓库绝对路径），行为不可复现
+        var selectedArtifacts = new LinkedHashMap<String, ArtifactResult>();
+
+        for (var result : artifactResults) {
+            var artifact = result.getArtifact();
+            if (artifact == null) {
+                continue;
+            }
+
+            var coords = artifact.getGroupId() + ":" + artifact.getArtifactId();
+            var existing = selectedArtifacts.get(coords);
+
+            if (existing == null) {
+                selectedArtifacts.put(coords, result);
+                continue;
+            }
+
+            var existingVersion = existing.getArtifact().getVersion();
+            var currentVersion = artifact.getVersion();
+
+            if (existingVersion.equals(currentVersion)) {
+                log.debug("跳过重复依赖: {}:{}", coords, currentVersion);
+                continue;
+            }
+
+            // 取舍规则：Core 直接依赖声明的版本优先；否则取较高版本
+            var preferCurrent = isPreferredVersion(coords, currentVersion, preferredVersions)
+                                || (!isPreferredVersion(coords, existingVersion, preferredVersions)
+                                    && Utils.compareVersions(currentVersion, existingVersion) > 0);
+
+            if (preferCurrent) {
+                log.info(
+                  "依赖 {} 存在多个版本（{} / {}），采用 {}",
+                  coords,
+                  existingVersion,
+                  currentVersion,
+                  currentVersion
+                );
+                selectedArtifacts.put(coords, result);
+            } else {
+                log.info(
+                  "依赖 {} 存在多个版本（{} / {}），忽略 {}",
+                  coords,
+                  existingVersion,
+                  currentVersion,
+                  currentVersion
+                );
+            }
+        }
+
+        // 组装 classpath：Core JAR 固定在最前，其余按坐标字典序排列，
+        // 避免依赖解析顺序（受哈希影响）导致不同机器上的加载顺序不一致
+        var dependencyUrls = new ArrayList<URL>(selectedArtifacts.size() + 1);
 
         try {
-            var url = coreJar.toURI().toURL();
-            artifactUrlSet.add(url);
+            dependencyUrls.add(coreJar.toURI().toURL());
         } catch (MalformedURLException e) {
             log.error("转换 Maibot Core JAR 文件路径为 URL 时发生错误，已终止启动", e);
             System.exit(1);
         }
 
-        artifactResults.forEach(result -> {
+        selectedArtifacts.keySet().stream().sorted().forEach(coords -> {
             try {
-                // 转换为 URL 并添加到集合中
-                // Set 自动去重
-                var url = result.getArtifact().getPath().toUri().toURL();
-                artifactUrlSet.add(url);
+                var url = selectedArtifacts.get(coords).getArtifact().getPath().toUri().toURL();
+                dependencyUrls.add(url);
             } catch (IOException e) {
                 log.error("转换依赖 JAR 文件路径为 URL 时发生错误，已终止启动", e);
                 System.exit(1);
                 // 永远不会执行到这里
             }
         });
-        // 去重并收集为列表
-        var dependencyUrls = artifactUrlSet.toArray(new URL[0]);
 
-        log.info("共成功加载了 {} 个依赖项", dependencyUrls.length);
-        return dependencyUrls;
+        log.info("共成功加载了 {} 个依赖项", dependencyUrls.size());
+        return dependencyUrls.toArray(new URL[0]);
+    }
+
+    /**
+     * 读取 JAR 内 META-INF/build-inf.properties 的 implDeps，解析为 groupId:artifactId -> version 映射。
+     * 仅用于确定多版本冲突时的优先版本，读取失败时返回空映射、不影响启动。
+     */
+    private static Map<String, String> readImplDeps(File jarFile) {
+        var preferredVersions = new HashMap<String, String>();
+
+        try (var jar = new JarFile(jarFile)) {
+            var buildInfoEntry = jar.getJarEntry("META-INF/build-inf.properties");
+            if (buildInfoEntry == null) {
+                return preferredVersions;
+            }
+
+            var properties = new Properties();
+            try (var buildInfoStream = jar.getInputStream(buildInfoEntry)) {
+                properties.load(buildInfoStream);
+            }
+
+            var deps = properties.getProperty("implDeps");
+            if (deps == null || deps.isBlank()) {
+                return preferredVersions;
+            }
+
+            for (var dep : deps.split(",")) {
+                var trimmed = dep.trim();
+                // 跳过空项与工程内模块依赖（由 Core 自身的打包逻辑处理）
+                if (trimmed.isBlank() || trimmed.startsWith("project:")) {
+                    continue;
+                }
+
+                var parts = trimmed.split(":");
+                if (parts.length >= 3) {
+                    preferredVersions.put(parts[0] + ":" + parts[1], parts[2]);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("读取 JAR '{}' 的 build-inf.properties 失败，多版本冲突将退回按最高版本选择", jarFile.getAbsolutePath(), e);
+        }
+
+        return preferredVersions;
+    }
+
+    /**
+     * 判断给定版本是否为 Core 直接依赖声明的优先版本。
+     */
+    private static boolean isPreferredVersion(String coords, String version, Map<String, String> preferredVersions) {
+        var preferredVersion = preferredVersions.get(coords);
+        return preferredVersion != null && preferredVersion.equals(version);
     }
 
     private static DependencyNode collectDependencies(
@@ -190,7 +295,9 @@ public class LauncherMain {
     throws IOException {
         log.info("收集依赖中...");
 
-        Set<DependencyNode> dependencies = new HashSet<>();
+        // 使用 LinkedHashSet 保持收集顺序（Core 在前、Mod 按列表顺序），
+        // 避免 HashSet 的哈希顺序让依赖解析结果随环境变化
+        Set<DependencyNode> dependencies = new LinkedHashSet<>();
 
         if (collectDependenciesFromJar(coreJar, dependencies, repoSystem, repoSession)) {
             log.error("Maibot Core JAR 文件的依赖解析失败，请检查对应的日志信息以获取更多细节");

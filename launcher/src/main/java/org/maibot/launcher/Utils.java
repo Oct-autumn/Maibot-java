@@ -56,6 +56,62 @@ public class Utils {
         }
     }
 
+    /**
+     * 粗略比较两个依赖版本号（面向 Maven 风格版本，如 4.2.12.Final）。
+     * <p>
+     * 逐段比较：数字段按数值比较；数字段优先级高于限定符段（如 4.2.12 &gt; 4.2.12.Final）；
+     * 限定符段按忽略大小写的字典序比较。缺失的段视为 0。
+     * <p>
+     * 说明：这里不是完整的 Maven ComparableVersion 实现，仅用于在依赖出现多版本冲突时
+     * 挑选较新的版本，避免为此引入额外依赖。
+     */
+    static int compareVersions(String left, String right) {
+        if (left == null || right == null) {
+            return 0;
+        }
+
+        var leftParts = left.split("[.\\-_+]");
+        var rightParts = right.split("[.\\-_+]");
+        var partCount = Math.max(leftParts.length, rightParts.length);
+
+        for (var i = 0; i < partCount; i++) {
+            var leftPart = i < leftParts.length ? leftParts[i] : "0";
+            var rightPart = i < rightParts.length ? rightParts[i] : "0";
+
+            var leftIsNumber = isNumber(leftPart);
+            var rightIsNumber = isNumber(rightPart);
+
+            if (leftIsNumber && rightIsNumber) {
+                var compareResult = Long.compare(Long.parseLong(leftPart), Long.parseLong(rightPart));
+                if (compareResult != 0) {
+                    return compareResult;
+                }
+            } else if (leftIsNumber != rightIsNumber) {
+                // 数字段（正式版本）优先级高于限定符段
+                return leftIsNumber ? 1 : -1;
+            } else {
+                var compareResult = leftPart.compareToIgnoreCase(rightPart);
+                if (compareResult != 0) {
+                    return compareResult;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static boolean isNumber(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        for (var i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static String calculateMD5(InputStream inputStream) {
         try {
             var md = java.security.MessageDigest.getInstance("MD5");

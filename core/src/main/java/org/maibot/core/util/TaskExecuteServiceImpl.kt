@@ -127,6 +127,9 @@ class TaskExecuteServiceImpl
                 log.error("线程发生致命错误，终止运行", e)
                 exitProcess(1)
             } catch (e: Throwable) {
+                // 任务异常必须记录日志：历史上 InnerServer 启动失败时，异常只被写进 Future，
+                // 调用方没有消费 Future，表现为“日志停在启动网络服务、端口不监听、进程存活”，极难排查
+                log.error("异步任务执行失败", e)
                 future.completeExceptionally(e)
             }
         }

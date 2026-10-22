@@ -5,13 +5,23 @@ import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler
 import org.maibot.sdk.exceptions.FatalError
 
-class WsProcessors(val path: String, handlers: MutableList<Class<*>>) : ChannelInboundHandlerAdapter() {
+/**
+ * WebSocket 处理器集合
+ *
+ * 描述某个 WS 路径上要装配的处理器链，以及该路径对应的平台标识。
+ * 平台标识用于 Core 把出站消息（[org.maibot.sdk.msg.OutgoingMessage]）路由到正确的连接。
+ *
+ * @param path     WebSocket 路径
+ * @param handlers 处理器类列表（可同时包含入站解码/构造处理器与出站编码处理器）
+ * @param platform 该路径所属的平台标识，例如 `qq`
+ */
+class WsProcessors(
+    val path: String,
+    handlers: MutableList<Class<*>>,
+    val platform: String
+) : ChannelInboundHandlerAdapter() {
     val handlers: MutableList<Class<*>>
 
-    /**
-     * @param path     WebSocket路径
-     * @param handlers 处理器类列表
-     */
     init {
         val finalHandlers = ArrayList<Class<*>>()
 

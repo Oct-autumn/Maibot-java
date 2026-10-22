@@ -9,6 +9,7 @@ import org.maibot.sdk.manager.InteractionGroupManager
 import org.maibot.sdk.manager.InteractionStreamManager
 import org.maibot.sdk.manager.MessageManager
 import org.maibot.sdk.storage.db.DatabaseService
+import org.maibot.sdk.storage.db.dao.Message
 import org.maibot.sdk.storage.model.msgevt.AbstractMessageEvent
 import org.slf4j.LoggerFactory
 
@@ -35,6 +36,32 @@ private constructor(
             log.error("保存消息事件到数据库时发生异常", e)
             throw e
         }
+    }
+
+    override fun listRecentMessages(em: EntityManager, streamId: String, limit: Int): List<Message> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+
+        // 先按序列号倒序取最近的 limit 条，再反转成从旧到新的顺序
+        val query = em.createQuery(
+            "SELECT m FROM Message m WHERE m.stream.id = :streamId ORDER BY m.sequence DESC",
+            Message::class.java
+        )
+        query.setParameter("streamId", streamId)
+        query.maxResults = limit
+
+        return query.resultList.reversed()
+    }
+
+    override fun findStreamIdBySequence(em: EntityManager, sequence: Long): String? {
+        val query = em.createQuery(
+            "SELECT m.stream.id FROM Message m WHERE m.sequence = :sequence",
+            String::class.java
+        )
+        query.setParameter("sequence", sequence)
+
+        return query.resultList.firstOrNull()
     }
 
     companion object {

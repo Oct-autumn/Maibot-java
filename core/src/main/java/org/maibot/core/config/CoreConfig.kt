@@ -20,6 +20,7 @@ data class CoreConfig(
         required = true
     ) val modelTasks: Map<String, List<ChoosableModel>> = mapOf(),
     @field:JsonProperty(value = "thinking") val thinking: Thinking = Thinking(),
+    @field:JsonProperty(value = "chat") val chat: Chat = Chat(),
 ) {
     data class BotInfo(
         @field:JsonProperty(value = "name", required = true) val name: String,
@@ -52,5 +53,26 @@ data class CoreConfig(
 
     data class Thinking(
         @field:JsonProperty(value = "observation_window_size") val observationWindowSize: Int = 30
+    )
+
+    /**
+     * 私聊聊天配置
+     *
+     * M1 阶段只支持私聊纯文本对话。所有字段都有默认值，旧配置文件缺少该节点时
+     * 会使用默认值（聊天默认关闭），不会导致启动失败。
+     */
+    data class Chat(
+        /** 是否启用聊天 */
+        @field:JsonProperty(value = "enabled") val enabled: Boolean = false,
+        /** 是否启用回环调试模式：收到私聊消息后把渲染结果原样发回，用于验证出站通道 */
+        @field:JsonProperty(value = "debug_echo") val debugEcho: Boolean = false,
+        /** 组装上下文时引用的历史消息条数 */
+        @field:JsonProperty(value = "history_limit") val historyLimit: Int = 20,
+        /** 调用模型的最长等待时间（秒） */
+        @field:JsonProperty(value = "reply_timeout_sec") val replyTimeoutSec: Long = 60,
+        /** 人设文件路径（相对于运行目录） */
+        @field:JsonProperty(value = "persona_file") val personaFile: String = "config/persona.txt",
+        /** 允许对话的用户平台 ID 列表；为空表示不限制 */
+        @field:JsonProperty(value = "allowed_users") val allowedUsers: List<String> = listOf()
     )
 }

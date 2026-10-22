@@ -32,7 +32,9 @@ class WsRouteHandler
         }
 
         processors[path] = wsProcessors
-        log.debug("注册WS处理器: PATH: {}", path)
+        // 登记平台 -> 路径，供 Core 发送出站消息时定位连接
+        activeWsManager.registerPlatform(wsProcessors.platform, path)
+        log.debug("注册WS处理器: PATH: {}（平台: {}）", path, wsProcessors.platform)
     }
 
     override fun channelRead0(ctx: ChannelHandlerContext, req: FullHttpRequest) {

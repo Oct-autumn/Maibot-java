@@ -2,6 +2,7 @@ package org.maibot.core.event
 
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
+import org.maibot.core.chat.ChatHandler
 import org.maibot.sdk.eventchannel.GlobalEventService
 import org.maibot.sdk.eventchannel.SimpleEventHandler
 import org.maibot.sdk.ioc.AutoInject
@@ -17,12 +18,18 @@ class GlobalEventServiceImpl : GlobalEventService, DestroyableComponent {
     private val taskExecuteService: TaskExecuteService;
 
     @AutoInject
-    private constructor(taskExecuteService: TaskExecuteService, msgPersistentHandler: MsgPersistentHandler) {
+    private constructor(
+        taskExecuteService: TaskExecuteService,
+        msgPersistentHandler: MsgPersistentHandler,
+        chatHandler: ChatHandler
+    ) {
         this.taskExecuteService = taskExecuteService
 
         log.info("正在注册系统事件处理器...")
 
         channel.pipeline().addLast("msg_persistent_handler", msgPersistentHandler)
+        // 聊天处理器必须在持久化之后：它依赖消息已经落库（历史查询、去重等）
+        channel.pipeline().addLast("chat_handler", chatHandler)
 
         log.info("系统事件服务已启动")
     }

@@ -88,3 +88,19 @@ port = 8080
 # 你可以根据实际情况调整这个值，建议在20-50之间进行尝试，以找到最佳的性能和上下文理解平衡点。
 # 默认为30
 # observation_window_size = 30
+
+# 聊天配置（M1：私聊纯文本对话）
+[chat]
+# 是否启用聊天
+# 默认为false，即不主动聊天
+# enabled = false
+# 回环调试模式：收到私聊消息后把渲染结果原样发回，仅用于验证出站通道，正式使用请保持关闭
+# debug_echo = false
+# 组装上下文时引用的历史消息条数
+# history_limit = 20
+# 调用模型的最长等待时间（秒）
+# reply_timeout_sec = 60
+# 人设文件路径（相对于运行目录）
+# persona_file = "config/persona.txt"
+# 允许对话的用户平台ID列表；为空表示不限制
+# allowed_users = []

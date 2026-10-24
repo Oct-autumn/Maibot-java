@@ -21,6 +21,7 @@ data class CoreConfig(
     ) val modelTasks: Map<String, List<ChoosableModel>> = mapOf(),
     @field:JsonProperty(value = "thinking") val thinking: Thinking = Thinking(),
     @field:JsonProperty(value = "chat") val chat: Chat = Chat(),
+    @field:JsonProperty(value = "model_log") val modelLog: ModelLog = ModelLog(),
 ) {
     data class BotInfo(
         @field:JsonProperty(value = "name", required = true) val name: String,
@@ -70,9 +71,29 @@ data class CoreConfig(
         @field:JsonProperty(value = "history_limit") val historyLimit: Int = 20,
         /** 调用模型的最长等待时间（秒） */
         @field:JsonProperty(value = "reply_timeout_sec") val replyTimeoutSec: Long = 60,
+        /** 发言使用的模型任务名（沿用 M1 的 `chat` 任务） */
+        @field:JsonProperty(value = "model_task") val modelTask: String = "chat",
         /** 人设文件路径（相对于运行目录） */
         @field:JsonProperty(value = "persona_file") val personaFile: String = "config/persona.txt",
         /** 允许对话的用户平台 ID 列表；为空表示不限制 */
         @field:JsonProperty(value = "allowed_users") val allowedUsers: List<String> = listOf()
+    )
+
+    /**
+     * 模型调用存档配置
+     *
+     * [persistContentTasks] 中的任务会把模型原始输出（thinking / content / toolCalls）
+     * 写入 model_interaction；其余任务只写 model_api_request 统计。
+     */
+    data class ModelLog(
+        /** 需要保存原始输出的任务名列表 */
+        @field:JsonProperty(value = "persist_content_tasks") val persistContentTasks: List<String> =
+            listOf("chat"),
+        /** 单个 TEXT 字段的最大字符数，超出会被截断 */
+        @field:JsonProperty(value = "content_max_chars") val contentMaxChars: Int = 20000,
+        /** model_interaction 保留天数，0 表示不清理 */
+        @field:JsonProperty(value = "content_retention_days") val contentRetentionDays: Int = 30,
+        /** 过期内容清理的检查间隔（分钟），0 表示只在启动时清理一次 */
+        @field:JsonProperty(value = "cleanup_interval_minutes") val cleanupIntervalMinutes: Int = 60,
     )
 }

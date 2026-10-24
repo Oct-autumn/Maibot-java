@@ -17,14 +17,14 @@ import org.slf4j.LoggerFactory
 class OutgoingMessageService
 @AutoInject private constructor(
     private val activeWsManager: ActiveWsManager
-) {
+) : OutgoingMessageSender {
     /**
      * 发送一条出站消息
      *
      * @param message 通用消息实例
      * @return 是否已提交到连接（false 表示平台未登记或当前没有活动连接）
      */
-    fun send(message: OutgoingMessage): Boolean {
+    override fun send(message: OutgoingMessage): Boolean {
         if (message.segments.isEmpty()) {
             log.warn("出站消息没有消息段，已忽略（平台: {}，目标: {}）", message.platform, message.platformTargetId)
             return false

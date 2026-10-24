@@ -2,6 +2,7 @@ package org.maibot.core.manager
 
 import jakarta.persistence.EntityManager
 import org.maibot.core.ioc.IOCImpl
+import org.maibot.sdk.SNoGenerator
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.manager.InteractionEntityManager
@@ -9,6 +10,8 @@ import org.maibot.sdk.manager.InteractionGroupManager
 import org.maibot.sdk.manager.InteractionStreamManager
 import org.maibot.sdk.manager.MessageManager
 import org.maibot.sdk.storage.db.DatabaseService
+import org.maibot.sdk.storage.db.dao.InteractionEntity
+import org.maibot.sdk.storage.db.dao.InteractionStream
 import org.maibot.sdk.storage.db.dao.Message
 import org.maibot.sdk.storage.model.msgevt.AbstractMessageEvent
 import org.slf4j.LoggerFactory
@@ -38,6 +41,31 @@ private constructor(
         }
     }
 
+    override fun saveBotMessage(
+        em: EntityManager,
+        streamId: String,
+        text: String,
+        sender: InteractionEntity,
+        objectType: String,
+        rawContentJson: String,
+    ): Message {
+        return DatabaseService.execInTransaction(em) {
+            val stream = em.find(InteractionStream::class.java, streamId)
+                ?: throw IllegalStateException("交互流不存在: $streamId")
+
+            Message().apply {
+                this.timestamp = System.currentTimeMillis()
+                this.sequence = SNoGenerator.nextSeq().sNo
+                this.promptStr = text
+                this.rawContentJson = rawContentJson
+                this.objectType = objectType
+                this.sender = sender
+                this.stream = stream
+                em.persist(this)
+            }
+        }
+    }
+
     override fun listRecentMessages(em: EntityManager, streamId: String, limit: Int): List<Message> {
         if (limit <= 0) {
             return emptyList()
@@ -52,6 +80,16 @@ private constructor(
         query.maxResults = limit
 
         return query.resultList.reversed()
+    }
+
+    override fun findMessageBySequence(em: EntityManager, sequence: Long): Message? {
+        val query = em.createQuery(
+            "SELECT m FROM Message m WHERE m.sequence = :sequence",
+            Message::class.java
+        )
+        query.setParameter("sequence", sequence)
+
+        return query.resultList.firstOrNull()
     }
 
     override fun findStreamIdBySequence(em: EntityManager, sequence: Long): String? {

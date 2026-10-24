@@ -19,10 +19,12 @@ package org.maibot.core
 import org.maibot.core.commandline.TerminalController
 import org.maibot.core.config.BuildInfo
 import org.maibot.core.config.CoreConfig
+import org.maibot.core.chat.ChatInitializer
 import org.maibot.core.ioc.Instance
 import org.maibot.core.ioc.Instance.scanImplementations
 import org.maibot.core.log.LogConfig
 import org.maibot.core.modloader.ModManager
+import org.maibot.core.model.ModelInteractionCleaner
 import org.maibot.core.net.InnerServer
 import org.maibot.core.net.client.HttpClientProviderImpl
 import org.maibot.core.thinking.ThinkingFlowManager
@@ -50,6 +52,8 @@ class MaibotMain
     private val httpClientProvider: HttpClientProviderImpl,
     private val terminalController: TerminalController,
     private val thinkingFlowManager: ThinkingFlowManager,
+    private val chatInitializer: ChatInitializer,
+    private val modelInteractionCleaner: ModelInteractionCleaner,
     private val modManager: ModManager
 ) {
     fun run() {
@@ -58,6 +62,12 @@ class MaibotMain
         val terminalFuture = start(
             "Core启动用时：{}ms"
         ) {
+            log.info("正在初始化聊天...")
+            this.chatInitializer.initialize()
+
+            log.info("正在初始化模型调用存档清理...")
+            this.modelInteractionCleaner.initialize()
+
             log.info("正在启动思维流...")
             this.thinkingFlowManager.initialize()
 

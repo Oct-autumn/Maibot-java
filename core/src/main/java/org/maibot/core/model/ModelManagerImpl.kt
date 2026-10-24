@@ -14,7 +14,8 @@ import org.maibot.sdk.model.*
 class ModelManagerImpl
 @AutoInject private constructor(
     @Value($$"${choosableModels:*}") config: ModelApiConfig,
-    private val taskExecuteService: TaskExecuteServiceImpl
+    private val taskExecuteService: TaskExecuteServiceImpl,
+    private val modelCallRecorder: ModelCallRecorder,
 ) : ModelManager() {
     /** API提供者名称与客户端实例的映射 */
     private val providers = HashMap<String, ModelClientBase>()
@@ -122,6 +123,12 @@ class ModelManagerImpl
                 ?: throw IllegalStateException("API provider $apiProviderName not found for model: ${model.modelIdentifier}")
         }
 
-        return ModelRequestHandlerImpl(this.taskExecuteService, apiProviderMap, choosableModels)
+        return ModelRequestHandlerImpl(
+            taskName,
+            this.taskExecuteService,
+            apiProviderMap,
+            choosableModels,
+            this.modelCallRecorder,
+        )
     }
 }

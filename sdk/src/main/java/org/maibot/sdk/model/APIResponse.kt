@@ -21,6 +21,11 @@ data class APIResponse(
     data class TokenStatistics(
         val inputTokens: Long,
         val outputTokens: Long,
-        val totalTokens: Long
+        val totalTokens: Long,
+        /**
+         * 缓存命中的输入 token 数；
+         * provider 未上报时保持 null（本地模型常见），不要用 0 表示“未上报”。
+         */
+        val cachedInputTokens: Long? = null,
     )
 }

@@ -4,6 +4,7 @@ import org.maibot.sdk.config.ChoosableModel
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.ioc.Value
+import org.maibot.sdk.model.ModelCallRequest
 import org.maibot.sdk.model.ModelManager
 import org.maibot.sdk.model.payload.MessageContextItem
 
@@ -37,7 +38,7 @@ private constructor(
             )
         )
 
-        modelManager["image_desc"]!!.getResponse(listOf(input)).get().let { resp ->
+        modelManager["image_desc"]!!.getResponse(ModelCallRequest(listOf(input))).get().let { resp ->
             return resp.response?.contentList[0]?.asText()
         }
     }

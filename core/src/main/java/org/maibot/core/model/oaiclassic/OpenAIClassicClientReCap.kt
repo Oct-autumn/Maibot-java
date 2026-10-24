@@ -69,10 +69,8 @@ class OpenAIClassicClientReCap : ModelClientBase {
             putAdditionalBodyProperty("enable_thinking", JsonValue.from(enableThinking))
 
             // 可选字段
-            availableFunc?.let { tools ->
-                {
-                    tools(tools.map { toChatCompletionTool(it) })
-                }
+            availableFunc?.let { funcs ->
+                tools(funcs.map { toChatCompletionTool(it) })
             }
             formatClass?.let {
                 responseFormat(it)
@@ -355,10 +353,21 @@ class OpenAIClassicClientReCap : ModelClientBase {
         } ?: emptyList()
 
         val usage = resp.usage().getOrNull()?.let {
+            // OpenAI 标准字段优先；DeepSeek 等兼容 provider 用扩展字段兜底。
+            // 都没有时保持 null，表示“该 provider 未上报”，不要写成 0。
+            val cached = it.promptTokensDetails().orElse(null)?.cachedTokens()?.orElse(null)
+                ?: listOf("prompt_cache_hit_tokens", "cache_read_input_tokens")
+                    .firstNotNullOfOrNull { key ->
+                        runCatching {
+                            it._additionalProperties()[key]?.convert(Long::class.javaObjectType)
+                        }.getOrNull()
+                    }
+
             APIResponse.TokenStatistics(
                 it.promptTokens(),
                 it.completionTokens(),
-                it.totalTokens()
+                it.totalTokens(),
+                cached
             )
         }
 

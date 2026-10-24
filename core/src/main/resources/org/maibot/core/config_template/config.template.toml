@@ -89,18 +89,32 @@ port = 8080
 # 默认为30
 # observation_window_size = 30
 
-# 聊天配置（M1：私聊纯文本对话）
+# 聊天配置（M3：观察窗口驱动发言）
 [chat]
 # 是否启用聊天
 # 默认为false，即不主动聊天
 # enabled = false
 # 回环调试模式：收到私聊消息后把渲染结果原样发回，仅用于验证出站通道，正式使用请保持关闭
 # debug_echo = false
-# 组装上下文时引用的历史消息条数
+# 观察窗口初始载入时引用的历史消息条数
 # history_limit = 20
 # 调用模型的最长等待时间（秒）
 # reply_timeout_sec = 60
+# 发言使用的模型任务名（对应 [[model_tasks.chat]]）
+# model_task = "chat"
 # 人设文件路径（相对于运行目录）
 # persona_file = "config/persona.txt"
 # 允许对话的用户平台ID列表；为空表示不限制
 # allowed_users = []
+
+# 模型调用存档配置
+# model_api_request 记录每次调用统计；model_interaction 记录原始输出，便于复盘
+[model_log]
+# 需要保存原始输出的任务名列表；为空则只写统计表
+# persist_content_tasks = ["chat"]
+# 单个文本字段的最大字符数，超出会被截断
+# content_max_chars = 20000
+# model_interaction 保留天数，0 表示不清理
+# content_retention_days = 30
+# 过期内容清理的检查间隔（分钟），0 表示只在启动时清理一次
+# cleanup_interval_minutes = 60

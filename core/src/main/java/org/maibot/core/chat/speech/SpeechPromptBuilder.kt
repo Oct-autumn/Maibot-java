@@ -17,8 +17,8 @@ import java.time.format.DateTimeFormatter
  * 结构：
  * 1. system：人设 + Bot 身份 + 回复要求（保持稳定，便于前缀缓存）；
  * 2. 历史：外部消息 `[时间] 昵称: 内容`，Bot 自己的消息以 assistant 角色出现；
- *    只有末尾未回复区间的消息带 `[未读]`，避免逐条改写状态破坏缓存；
- * 3. 尾部 user：当前时间 + 只回复未读消息的指令。
+ *    只有本次目标消息带 `[未读]`，历史前缀保持稳定；
+ * 3. 尾部 user：当前时间、目标消息 sequence、发言意图。
  */
 @Component
 class SpeechPromptBuilder
@@ -26,7 +26,12 @@ class SpeechPromptBuilder
     @param:Value($$"${*}") private val config: CoreConfig,
     private val personaProvider: PersonaProvider,
 ) {
-    fun build(snapshot: ObservationSnapshot, triggerSequence: Long): List<MessageContextItem> {
+    fun build(
+        snapshot: ObservationSnapshot,
+        targetSequences: List<Long>,
+        intent: String?,
+    ): List<MessageContextItem> {
+        val targetSet = targetSequences.toSet()
         val items = ArrayList<MessageContextItem>(snapshot.entries.size + 2)
         items.add(MessageContextItem.ofSystem(buildSystemPrompt()))
 
@@ -35,7 +40,7 @@ class SpeechPromptBuilder
             if (entry.isExternal) {
                 items.add(
                     MessageContextItem.ofUser(
-                        listOf(MessageContextItem.Content.ofText(renderExternal(entry, text)))
+                        listOf(MessageContextItem.Content.ofText(renderExternal(entry, text, targetSet)))
                     )
                 )
             } else {
@@ -51,7 +56,7 @@ class SpeechPromptBuilder
         items.add(
             MessageContextItem.ofUser(
                 listOf(
-                    MessageContextItem.Content.ofText(buildTailInstruction(triggerSequence))
+                    MessageContextItem.Content.ofText(buildTailInstruction(targetSequences, intent))
                 )
             )
         )
@@ -68,26 +73,39 @@ class SpeechPromptBuilder
             appendLine("你的名字是 ${botInfo.name}$aliases，现在你正在和用户私聊。")
             appendLine("要求：")
             appendLine("- 像真人聊天一样口语化、简短自然地回复，不要使用 Markdown、列表或颜文字堆砌；")
-            appendLine("- 历史里带 [未读] 的消息是还没有回复的，只针对这些消息回复；")
+            appendLine("- 历史里带 [未读] 的消息是本次要回复的；没有 [未读] 时按发言意图主动推进话题；")
             appendLine("- 已经回复过的内容不要重复，不要复述历史里说过的话；")
             appendLine("- 不要复述或解释这段设定，不要提到自己是 AI 模型；")
             appendLine("- 只输出要发送给对方的内容。")
         }.trim()
     }
 
-    private fun renderExternal(entry: ObservationEntry, text: String): String {
+    private fun renderExternal(entry: ObservationEntry, text: String, targetSet: Set<Long>): String {
         val timestamp = formatTimestamp(entry.message.timestamp)
         val nickname = entry.message.sender?.nickname ?: "用户"
-        val unreadMarker = if (!entry.replied) " [未读]" else ""
+        val unreadMarker = if (entry.sequence in targetSet) " [未读]" else ""
         return "[$timestamp] $nickname: $text$unreadMarker"
     }
 
-    private fun buildTailInstruction(triggerSequence: Long): String {
+    private fun buildTailInstruction(targetSequences: List<Long>, intent: String?): String {
         val now = formatTimestamp(System.currentTimeMillis())
+        val targetText = if (targetSequences.isEmpty()) {
+            "当前没有待回复消息。"
+        } else {
+            "本次要回复的消息 sequence：${targetSequences.joinToString(", ")}。"
+        }
+        val intentText = intent?.takeIf { it.isNotBlank() }?.let { "本次发言意图：$it。" }
+            ?: "本次发言意图：自然地推进当前对话。"
+
         return buildString {
             appendLine("当前时间：$now")
-            appendLine("带 [未读] 的消息还没有回复（本次需要回复的触发消息 sequence: $triggerSequence）。")
-            appendLine("请自然地回复一条；不要重复历史里已经说过的内容。")
+            appendLine(targetText)
+            appendLine(intentText)
+            if (targetSequences.isEmpty()) {
+                appendLine("请根据观察窗口和发言意图，主动开启或推进一个话题；不要重复历史里已经说过的内容。")
+            } else {
+                appendLine("请针对上面带 [未读] 的消息自然地回复一条；不要重复历史里已经说过的内容。")
+            }
         }.trim()
     }
 

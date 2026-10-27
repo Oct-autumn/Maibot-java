@@ -22,8 +22,13 @@ class ModelSpeechGenerator
     private val modelCaller: ModelCaller,
     private val promptBuilder: SpeechPromptBuilder,
 ) : SpeechGenerator {
-    override fun generate(snapshot: ObservationSnapshot, triggerSequence: Long): String? {
-        val messages = promptBuilder.build(snapshot, triggerSequence)
+    override fun generate(
+        snapshot: ObservationSnapshot,
+        targetSequences: List<Long>,
+        intent: String?,
+    ): String? {
+        val messages = promptBuilder.build(snapshot, targetSequences, intent)
+        val triggerSequence = targetSequences.maxOrNull() ?: snapshot.triggerSequence
         val request = ModelCallRequest(
             messageContext = messages,
             callContext = ModelCallContext(
@@ -40,5 +45,4 @@ class ModelSpeechGenerator
 
         return response.response?.contentList?.firstOrNull()?.asText()?.trim()?.takeIf { it.isNotBlank() }
     }
-
 }

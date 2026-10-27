@@ -1,8 +1,10 @@
 package org.maibot.core.thinking
 
+import org.maibot.core.config.CoreConfig
 import org.maibot.core.ioc.Instance
 import org.maibot.core.persistence.DatabaseServiceImpl
 import org.maibot.core.thinking.observer.FlowObserver
+import org.maibot.core.thinking.observer.FlowTiming
 import org.maibot.core.thinking.observer.ObservationStrategy
 import org.maibot.core.util.TaskExecuteServiceImpl
 import org.maibot.sdk.exceptions.DbOperationException
@@ -35,32 +37,42 @@ class ThinkingFlowManager
     private val messageManager: MessageManager,
     private val flowRegistry: ThinkingFlowRegistry,
     private val observationStrategy: ObservationStrategy,
+    private val stateStore: ThinkingFlowStateStore,
     @param:Value($$"${chat.history_limit}") private val historyLimit: Int,
+    @param:Value($$"${thinking}") private val thinkingConfig: CoreConfig.Thinking,
 ) : DestroyableComponent {
 
     /**
-     * 初始化思维流管理器：从数据库恢复已有的交互流并启动观察线程
+     * 初始化思维流管理器：从数据库恢复已有的交互流和观察状态，并启动观察线程
      */
     fun initialize() {
-        restoreFromDb()
+        val persistedStates = try {
+            stateStore.loadAll()
+        } catch (e: Exception) {
+            log.warn("从数据库加载思维流状态失败，全部按未持久化处理", e)
+            emptyMap()
+        }
+        restoreFromDb(persistedStates)
     }
 
     /**
      * 从数据库恢复交互流
      */
-    private fun restoreFromDb() {
+    private fun restoreFromDb(persistedStates: Map<String, PersistedFlowState>) {
         try {
             val streamIds = databaseService.exec { em ->
                 val cb = em.criteriaBuilder
                 val cq = cb.createQuery(String::class.java)
                 val root = cq.from(InteractionStream::class.java)
-                cq.select(root.get<String>("id"))
+                cq.select(root.get("id"))
                 em.createQuery(cq).resultList
             }
 
             for (streamId in streamIds) {
-                getOrCreateInteractionFlow(streamId)
+                getOrCreateInteractionFlow(streamId, persistedStates[streamId])
             }
+
+            log.info("已从数据库恢复 {} 个交互流", streamIds.size)
         } catch (e: DbOperationException) {
             log.warn("从数据库恢复交互流失败", e)
         }
@@ -71,11 +83,17 @@ class ThinkingFlowManager
      */
     fun getOrCreateInteractionFlow(streamId: String): ThinkingFlow {
         return flowRegistry.get(streamId) ?: flowRegistry.computeIfAbsent(streamId) {
-            createFlow(streamId)
+            createFlow(streamId, null)
         }
     }
 
-    private fun createFlow(streamId: String): ThinkingFlow {
+    private fun getOrCreateInteractionFlow(streamId: String, persisted: PersistedFlowState?): ThinkingFlow {
+        return flowRegistry.get(streamId) ?: flowRegistry.computeIfAbsent(streamId) {
+            createFlow(streamId, persisted)
+        }
+    }
+
+    private fun createFlow(streamId: String, persisted: PersistedFlowState?): ThinkingFlow {
         require(streamId.matches(STREAM_ID_PATTERN)) { "Invalid stream ID: $streamId" }
 
         val flow = Instance.get(ThinkingFlowFactory::class.java).setFlowId(streamId).build()
@@ -88,12 +106,56 @@ class ThinkingFlowManager
         }
         flow.restoreHistory(history)
 
-        taskExecutorService.submit(true) {
-            FlowObserver(flow, observationStrategy).run()
+        val restored = restoreFlowState(flow, persisted)
+        flow.restoreState(restored)
+
+        // 状态校正后立即回写，保证下次重启读到的是一致的快照
+        try {
+            stateStore.save(streamId, restored)
+        } catch (e: Exception) {
+            log.warn("回写思维流状态失败: {}", streamId, e)
         }
 
-        log.debug("已创建思维流并启动观察线程: {}", streamId)
+        taskExecutorService.submit(true) {
+            FlowObserver(flow, observationStrategy, stateStore, FlowTiming.from(thinkingConfig)).run()
+        }
+
+        log.debug("已创建思维流并启动观察线程: {}, state={}", streamId, restored.state)
         return flow
+    }
+
+    /**
+     * 恢复持久化状态
+     *
+     * 状态退出不再依赖 idle 时长，因此这里只补齐活动时间/观察位置；
+     * 间隔由 FlowObserver 从当前状态的 base 重新开始。
+     */
+    private fun restoreFlowState(flow: ThinkingFlow, persisted: PersistedFlowState?): PersistedFlowState {
+        val now = System.currentTimeMillis()
+
+        if (persisted == null) {
+            return PersistedFlowState(
+                state = FlowState.INACTIVE,
+                lastActivityAt = maxOf(flow.lastActivityAt, now),
+                lastObservedSequence = flow.lastObservedSequence,
+                lastDecision = null,
+            )
+        }
+
+        var lastActivityAt = maxOf(persisted.lastActivityAt, flow.lastActivityAt)
+        if (persisted.state != FlowState.INACTIVE && lastActivityAt <= 0) {
+            lastActivityAt = now
+        }
+
+        return persisted.copy(
+            lastActivityAt = lastActivityAt,
+            // 0 视为“没有持久化观察位置”，退回窗口内最大 sequence，避免重放旧消息
+            lastObservedSequence = if (persisted.lastObservedSequence > 0) {
+                persisted.lastObservedSequence
+            } else {
+                flow.lastObservedSequence
+            },
+        )
     }
 
     /**
@@ -114,8 +176,20 @@ class ThinkingFlowManager
 
     /**
      * 关闭思维流管理器
+     *
+     * 先 flush 当前状态，再停止观察线程；停机期间正在执行的观察不保证完成。
      */
     override fun preDestroy() {
+        val states = flowRegistry.all()
+            .mapNotNull { flow -> flow.id?.let { it to flow.persistedState() } }
+            .toMap()
+
+        try {
+            stateStore.saveAll(states)
+        } catch (e: Exception) {
+            log.warn("关闭时保存思维流状态失败", e)
+        }
+
         for (flow in flowRegistry.all()) {
             flow.stopObserving()
         }
@@ -129,10 +203,10 @@ class ThinkingFlowManager
 
             flows.forEach { flow ->
                 when (flow.state) {
-                    ThinkingFlow.FlowState.ACTIVE -> activeCount++
-                    ThinkingFlow.FlowState.FOCUSED -> focusedCount++
-                    else -> {
-                        // 其他状态不计入活跃或专注计数
+                    FlowState.ACTIVE -> activeCount++
+                    FlowState.FOCUSED -> focusedCount++
+                    FlowState.INACTIVE -> {
+                        // 不活跃流单独统计
                     }
                 }
             }

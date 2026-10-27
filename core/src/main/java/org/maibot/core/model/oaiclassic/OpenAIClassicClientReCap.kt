@@ -16,6 +16,8 @@ import org.maibot.sdk.model.APIResponse
 import org.maibot.sdk.model.ModelClientBase
 import org.maibot.sdk.model.payload.AvailableFunctionItem
 import org.maibot.sdk.model.payload.MessageContextItem
+import org.maibot.sdk.model.payload.ToolCall
+import org.maibot.sdk.model.payload.ToolChoice
 import org.maibot.sdk.util.MapperUtils
 import org.slf4j.LoggerFactory.getLogger
 import java.time.Duration
@@ -59,7 +61,8 @@ class OpenAIClassicClientReCap : ModelClientBase {
         maxTokens: Long,
         temperature: Double,
         enableThinking: Boolean,
-        forceStreamMode: Boolean
+        forceStreamMode: Boolean,
+        toolChoice: ToolChoice?,
     ): APIResponse {
         val params = ChatCompletionCreateParams.builder().apply {
             model(modelIdentifier)
@@ -74,6 +77,13 @@ class OpenAIClassicClientReCap : ModelClientBase {
             }
             formatClass?.let {
                 responseFormat(it)
+            }
+            toolChoice?.let { choice ->
+                when (choice) {
+                    ToolChoice.REQUIRED -> toolChoice(ChatCompletionToolChoiceOption.Auto.REQUIRED)
+                    ToolChoice.NONE -> toolChoice(ChatCompletionToolChoiceOption.Auto.NONE)
+                    ToolChoice.AUTO -> toolChoice(ChatCompletionToolChoiceOption.Auto.AUTO)
+                }
             }
         }.build()
 
@@ -213,7 +223,17 @@ class OpenAIClassicClientReCap : ModelClientBase {
             MessageContextItem.Role.ASSISTANT -> {
                 val messageParamBuilder = ChatCompletionAssistantMessageParam.builder()
                 val contentParts = messageContextItem.contentList.mapNotNull { contentToAssistantTextPart(it) }
-                messageParamBuilder.contentOfArrayOfContentParts(contentParts)
+                if (contentParts.isNotEmpty()) {
+                    messageParamBuilder.contentOfArrayOfContentParts(contentParts)
+                }
+
+                // 工具循环需要把上一轮 assistant 的 tool_calls 原样带回；
+                // 只有 tool_calls、没有文本时 content 必须省略，不能传空数组。
+                if (messageContextItem.toolCalls.isNotEmpty()) {
+                    messageParamBuilder.toolCalls(
+                        messageContextItem.toolCalls.map { toChatCompletionMessageToolCall(it) }
+                    )
+                }
 
                 return ChatCompletionMessageParam.ofAssistant(messageParamBuilder.build())
             }
@@ -227,6 +247,27 @@ class OpenAIClassicClientReCap : ModelClientBase {
                 return ChatCompletionMessageParam.ofTool(messageParamBuilder.build())
             }
         }
+    }
+
+    /**
+     * 将工具调用转换为 OpenAI SDK 的 tool_call 结构
+     */
+    private fun toChatCompletionMessageToolCall(toolCall: ToolCall): ChatCompletionMessageToolCall {
+        val arguments = toolCall.arguments?.let {
+            MapperUtils.jsonMapper.writeValueAsString(it)
+        } ?: "{}"
+
+        return ChatCompletionMessageToolCall.ofFunction(
+            ChatCompletionMessageFunctionToolCall.builder()
+                .id(toolCall.id)
+                .function(
+                    ChatCompletionMessageFunctionToolCall.Function.builder()
+                        .name(toolCall.name)
+                        .arguments(arguments)
+                        .build()
+                )
+                .build()
+        )
     }
 
     /**
@@ -320,7 +361,7 @@ class OpenAIClassicClientReCap : ModelClientBase {
         var reasoningContent = choice.message()._additionalProperties()["reasoning_content"]?.asString()?.getOrNull()
         var responseContent = choice.message().content().getOrNull()
 
-        if (reasoningContent == null) {
+        if (reasoningContent == null && responseContent != null) {
             val matchResult = REASONING_CAPTURE_REGEX.find(responseContent!!)
             if (matchResult != null) {
                 reasoningContent = matchResult.groups["thinking"]?.value

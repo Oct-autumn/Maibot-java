@@ -65,7 +65,7 @@ class MaibotMain
             log.info("正在初始化聊天...")
             this.chatInitializer.initialize()
 
-            log.info("正在初始化模型调用存档清理...")
+            log.info("正在初始化模型调用存档清理（包含定时任务）...")
             this.modelInteractionCleaner.initialize()
 
             log.info("正在启动思维流...")

@@ -89,6 +89,33 @@ port = 8080
 # 默认为30
 # observation_window_size = 30
 
+# ACTIVE 首次/重置后的观察间隔（秒）
+# active_interval_sec = 30
+# ACTIVE 退避后的最大观察间隔（秒）
+# active_max_interval_sec = 120
+# FOCUSED 首次/重置后的主动观察间隔（秒）
+# focus_interval_sec = 15
+# FOCUSED 退避后的最大主动观察间隔（秒）
+# focus_max_interval_sec = 300
+# 每次 wait_and_watch 后间隔的增长因子；1.0 表示固定间隔
+# interval_growth_factor = 2.0
+# 到达最大间隔后仍会再观察两轮，两轮都没有新消息/发言/状态动作就退出当前状态
+
+# ObserverAI 配置
+[thinking.observer]
+# 观察模型任务名，对应 [[model_tasks.observer]]
+# model_task = "observer"
+# 单次观察等待模型的最长时间（秒）
+# timeout_sec = 30
+# 一次观察内最多几轮工具调用
+# max_tool_rounds = 4
+
+# 观察模型任务示例（与 [[model_tasks.chat]] 同级）
+# [[model_tasks.observer]]
+# model_name = "your-model"
+# temperature = 0.7
+# max_tokens = 512
+
 # 聊天配置（M3：观察窗口驱动发言）
 [chat]
 # 是否启用聊天
@@ -111,7 +138,7 @@ port = 8080
 # model_api_request 记录每次调用统计；model_interaction 记录原始输出，便于复盘
 [model_log]
 # 需要保存原始输出的任务名列表；为空则只写统计表
-# persist_content_tasks = ["chat"]
+# persist_content_tasks = ["chat", "observer"]
 # 单个文本字段的最大字符数，超出会被截断
 # content_max_chars = 20000
 # model_interaction 保留天数，0 表示不清理

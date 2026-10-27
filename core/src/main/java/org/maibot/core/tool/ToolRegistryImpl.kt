@@ -1,6 +1,10 @@
 package org.maibot.core.tool
 
 import org.maibot.core.chat.speech.SpeakTool
+import org.maibot.core.thinking.tool.FocusWatchTool
+import org.maibot.core.thinking.tool.QuitWatchTool
+import org.maibot.core.thinking.tool.UnfocusWatchTool
+import org.maibot.core.thinking.tool.WaitAndWatchTool
 import org.maibot.sdk.ioc.AutoInject
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.tool.Tool
@@ -12,18 +16,25 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Core 工具注册表
  *
- * W/O 阶段只注册 `speak`；`wait_and_watch` / `quit_watch` 等工具在接入
- * ObserverAI 时再注册。mod 提供的工具通过 [register] 注册进来。
+ * 注册 ObserverAI 可用的内置工具；mod 提供的工具通过 [register] 注册进来。
  */
 @Component
 class ToolRegistryImpl
 @AutoInject private constructor(
     speakTool: SpeakTool,
+    waitAndWatchTool: WaitAndWatchTool,
+    focusWatchTool: FocusWatchTool,
+    unfocusWatchTool: UnfocusWatchTool,
+    quitWatchTool: QuitWatchTool,
 ) : ToolRegistry() {
     private val tools = ConcurrentHashMap<String, Tool>()
 
     init {
         register(speakTool)
+        register(waitAndWatchTool)
+        register(focusWatchTool)
+        register(unfocusWatchTool)
+        register(quitWatchTool)
     }
 
     override fun register(tool: Tool) {

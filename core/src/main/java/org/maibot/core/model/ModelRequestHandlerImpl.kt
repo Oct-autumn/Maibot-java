@@ -34,8 +34,7 @@ class ModelRequestHandlerImpl(
      *
      * - 任务开始时写一条 IN_PROGRESS 审计记录；
      * - 依次尝试候选模型（客户端内部还会按配置重试）；
-     * - 全部失败后只写一条 FAILED，成功则写 SUCCESS；
-     * - 中间单次请求失败不单独落库。
+     * - 全部失败后写 FAILED，成功则写 SUCCESS；
      */
     inner class RequestTask(
         private val request: ModelCallRequest,
@@ -148,7 +147,8 @@ class ModelRequestHandlerImpl(
                     modelConfig.maxTokens,
                     modelConfig.temperature,
                     modelConfig.enableThinking,
-                    modelConfig.forceStreamMode
+                    modelConfig.forceStreamMode,
+                    request.toolChoice,
                 )
             }
         }

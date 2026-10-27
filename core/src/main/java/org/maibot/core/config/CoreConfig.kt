@@ -53,8 +53,30 @@ data class CoreConfig(
     )
 
     data class Thinking(
-        @field:JsonProperty(value = "observation_window_size") val observationWindowSize: Int = 30
-    )
+        /** 观察窗口容量 */
+        @field:JsonProperty(value = "observation_window_size") val observationWindowSize: Int = 30,
+        /** ACTIVE 首次/重置后的观察间隔（秒） */
+        @field:JsonProperty(value = "active_interval_sec") val activeIntervalSec: Long = 30,
+        /** ACTIVE 退避后的最大观察间隔（秒） */
+        @field:JsonProperty(value = "active_max_interval_sec") val activeMaxIntervalSec: Long = 120,
+        /** FOCUSED 首次/重置后的主动观察间隔（秒） */
+        @field:JsonProperty(value = "focus_interval_sec") val focusIntervalSec: Long = 15,
+        /** FOCUSED 退避后的最大主动观察间隔（秒） */
+        @field:JsonProperty(value = "focus_max_interval_sec") val focusMaxIntervalSec: Long = 300,
+        /** 每次 wait 后间隔的增长因子；1.0 表示固定间隔 */
+        @field:JsonProperty(value = "interval_growth_factor") val intervalGrowthFactor: Double = 2.0,
+        /** ObserverAI 配置 */
+        @field:JsonProperty(value = "observer") val observer: Observer = Observer(),
+    ) {
+        data class Observer(
+            /** 观察模型任务名 */
+            @field:JsonProperty(value = "model_task") val modelTask: String = "observer",
+            /** 单次观察等待模型的最长时间（秒） */
+            @field:JsonProperty(value = "timeout_sec") val timeoutSec: Long = 30,
+            /** 一次观察内最多几轮工具调用 */
+            @field:JsonProperty(value = "max_tool_rounds") val maxToolRounds: Int = 4,
+        )
+    }
 
     /**
      * 私聊聊天配置

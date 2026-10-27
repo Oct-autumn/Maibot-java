@@ -6,10 +6,8 @@ import org.maibot.core.thinking.ThinkingFlow
 /**
  * 观察策略
  *
- * 决定「这次观察做什么」：W/O 阶段是固定发言，后续 ObserverAI 阶段是
- * 调用轻量决策模型并执行它返回的工具调用。
- *
- * 策略只依赖工具/模型等能力，不负责观察循环的时序。
+ * 决定「这次观察做什么」：调用 ObserverAI、执行工具循环，并返回状态机需要的决策。
+ * 策略只依赖模型/工具等能力，不负责观察循环的时序与状态迁移。
  */
 interface ObservationStrategy {
     /**

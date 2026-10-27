@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.maibot.core.config.CoreConfig
+import org.maibot.core.thinking.FlowState
 import org.maibot.core.thinking.ObservationEntry
 import org.maibot.core.thinking.ObservationSnapshot
+import org.maibot.core.thinking.ObservationTrigger
 import org.maibot.sdk.model.payload.MessageContextItem
 import org.maibot.sdk.storage.db.dao.InteractionEntity
 import org.maibot.sdk.storage.db.dao.Message
@@ -40,15 +42,23 @@ class SpeechPromptBuilderTest {
     }
 
     @Test
-    fun `历史保持稳定，只有末尾未回复消息带未读标记`() {
+    fun `历史保持稳定，只有目标消息带未读标记`() {
         val entries = listOf(
             ObservationEntry(message(1, "在吗"), ObservationEntry.Origin.EXTERNAL, replied = true),
             ObservationEntry(message(2, "在的", bot = true), ObservationEntry.Origin.SELF, replied = true),
             ObservationEntry(message(3, "看看这个"), ObservationEntry.Origin.EXTERNAL, replied = false),
         )
-        val snapshot = ObservationSnapshot("P-1", version = 3, entries = entries, triggerSequence = 3)
+        val snapshot = ObservationSnapshot(
+            streamId = "P-1",
+            version = 3,
+            state = FlowState.ACTIVE,
+            entries = entries,
+            newSequences = setOf(3L),
+            trigger = ObservationTrigger.NEW_MESSAGE,
+            triggerSequence = 3L,
+        )
 
-        val items = builder.build(snapshot, 3L)
+        val items = builder.build(snapshot, listOf(3L), "回应对方刚才发的图片")
 
         assertEquals(MessageContextItem.Role.SYSTEM, items.first().role)
         val systemText = items.first().contentList.first().asText()!!
@@ -67,23 +77,30 @@ class SpeechPromptBuilderTest {
 
         val tail = userTexts.last()
         assertTrue(tail.contains("当前时间"))
-        assertTrue(tail.contains("sequence: 3"))
+        assertTrue(tail.contains("sequence：3"))
+        assertTrue(tail.contains("回应对方刚才发的图片"))
         assertTrue(tail.contains("[未读]"))
     }
 
     @Test
-    fun `已回复的外部消息不再带未读标记`() {
+    fun `没有目标消息时走主动话题分支`() {
         val snapshot = ObservationSnapshot(
-            "P-1",
+            streamId = "P-1",
             version = 1,
+            state = FlowState.FOCUSED,
             entries = listOf(ObservationEntry(message(1, "在吗"), ObservationEntry.Origin.EXTERNAL, replied = true)),
-            triggerSequence = 1,
+            trigger = ObservationTrigger.PERIODIC,
         )
 
-        val items = builder.build(snapshot, 1L)
+        val items = builder.build(snapshot, emptyList(), "主动开启一个轻松的话题")
 
-        val userText = items.first { it.role == MessageContextItem.Role.USER }
-            .contentList.first().asText()!!
-        assertFalse(userText.contains("[未读]"))
+        val userTexts = items.filter { it.role == MessageContextItem.Role.USER }
+            .map { it.contentList.first().asText()!! }
+        assertTrue(userTexts.none { it.contains("[未读]") })
+        val tail = userTexts.last()
+        assertTrue(tail.contains("当前没有待回复消息"))
+        assertTrue(tail.contains("主动开启一个轻松的话题"))
+        assertTrue(tail.contains("主动开启或推进"))
+        assertFalse(tail.contains("本次要回复的消息 sequence"))
     }
 }

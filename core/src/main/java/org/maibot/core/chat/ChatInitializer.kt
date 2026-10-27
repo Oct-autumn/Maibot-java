@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 /**
  * 聊天启动初始化
  *
- * 在启动期注册发言模型任务，避免像 M1 那样等到第一条消息才在 ChatService 构造函数里注册。
+ * 在启动期注册发言模型任务。
  */
 @Component
 class ChatInitializer
@@ -20,18 +20,24 @@ class ChatInitializer
     private val modelManager: ModelManager,
 ) {
     fun initialize() {
-        val taskName = config.chat.modelTask
-        val models = config.modelTasks[taskName]
-
-        if (models.isNullOrEmpty()) {
+        val chatModels = config.modelTasks[config.chat.modelTask]
+        if (chatModels.isNullOrEmpty()) {
             if (config.chat.enabled) {
-                log.warn("未配置 model_tasks.{}，聊天已启用但无法生成回复", taskName)
+                log.warn("未配置 model_tasks.{}，聊天功能已启用但无法调用模型", config.chat.modelTask)
             }
-            return
+        } else {
+            modelManager[config.chat.modelTask] = chatModels
         }
 
-        modelManager[taskName] = models
-        log.info("聊天任务模型已注册: task={}, models={}", taskName, models.joinToString { it.modelName })
+        val observerTask = config.thinking.observer.modelTask
+        val observerModels = config.modelTasks[observerTask]
+        if (observerModels.isNullOrEmpty()) {
+            if (config.chat.enabled) {
+                log.warn("未配置 model_tasks.{}，观察功能已启用但无法调用模型", observerTask)
+            }
+        } else {
+            modelManager[observerTask] = observerModels
+        }
     }
 
     companion object {

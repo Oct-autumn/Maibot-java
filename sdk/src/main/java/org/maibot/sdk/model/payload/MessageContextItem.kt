@@ -18,7 +18,14 @@ private constructor(
     /**
      * 工具调用ID，仅当role为TOOL时有效，标识该消息内容来源于哪个工具调用
      */
-    val toolCallId: String?
+    val toolCallId: String?,
+    /**
+     * assistant 发起的工具调用；仅当 role 为 ASSISTANT 时可能非空。
+     *
+     * 工具循环需要把上一轮 assistant 的 tool_calls 原样带回，否则模型无法把
+     * 后续的 TOOL 结果与调用关联起来。
+     */
+    val toolCalls: List<ToolCall> = emptyList(),
 ) {
     enum class Role(val roleName: String) {
         USER("user"),
@@ -262,6 +269,16 @@ private constructor(
 
         @JvmStatic
         fun ofAssistant(contentList: List<Content>) = MessageContextItem(Role.ASSISTANT, contentList, null)
+
+        /**
+         * 构造带 tool_calls 的 assistant 消息
+         *
+         * @param contentList assistant 的文本内容，可为空
+         * @param toolCalls   模型发起的工具调用列表
+         */
+        @JvmStatic
+        fun ofAssistantWithToolCalls(contentList: List<Content>, toolCalls: List<ToolCall>) =
+            MessageContextItem(Role.ASSISTANT, contentList, null, toolCalls)
 
         @JvmStatic
         fun ofSystem(content: String) = MessageContextItem(Role.SYSTEM, listOf(Content.ofText(content)), null)

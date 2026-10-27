@@ -2,6 +2,7 @@ package org.maibot.sdk.model
 
 import org.maibot.sdk.model.payload.AvailableFunctionItem
 import org.maibot.sdk.model.payload.MessageContextItem
+import org.maibot.sdk.model.payload.ToolChoice
 
 /**
  * 一次模型调用请求
@@ -12,6 +13,7 @@ import org.maibot.sdk.model.payload.MessageContextItem
  * @param messageContext 对话上下文
  * @param availableFunc  可用的工具定义（可选）
  * @param formatClass    结构化输出的目标类型（可选）
+ * @param toolChoice     工具选择策略（可选），见 [ToolChoice]
  * @param callContext    调用方业务上下文（可选，仅用于存档关联）
  */
 @JvmRecord
@@ -20,4 +22,5 @@ data class ModelCallRequest(
     val availableFunc: List<AvailableFunctionItem>? = null,
     val formatClass: Class<*>? = null,
     val callContext: ModelCallContext? = null,
+    val toolChoice: ToolChoice? = null,
 )

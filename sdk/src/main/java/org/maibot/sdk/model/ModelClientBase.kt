@@ -2,6 +2,7 @@ package org.maibot.sdk.model
 
 import org.maibot.sdk.model.payload.AvailableFunctionItem
 import org.maibot.sdk.model.payload.MessageContextItem
+import org.maibot.sdk.model.payload.ToolChoice
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -23,6 +24,7 @@ abstract class ModelClientBase protected constructor(
         temperature: Double,
         enableThinking: Boolean = false,
         forceStreamMode: Boolean = false,
+        toolChoice: ToolChoice? = null,
     ): APIResponse
 
     abstract fun getEmbedding(

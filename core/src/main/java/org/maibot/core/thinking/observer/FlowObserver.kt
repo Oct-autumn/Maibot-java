@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory
 /**
  * 每个思维流的观察循环
  *
- * 负责三态状态机、退避计时器和状态迁移；不决定说什么。
- * 具体「这次观察做什么」由 [ObservationStrategy] 决定。
+ * 负责观察时序、退避和 cap 退出；具体「这次观察做什么」由 [ObservationStrategy] 决定，
+ * 工具触发的状态迁移由 [ThinkingFlow] 的状态切换方法完成，这里只感知结果并重算计时。
  *
  * 退避规则：
  * - 每次 `wait_and_watch` 后间隔按 growthFactor 增长，直到当前状态的 max；
@@ -24,20 +24,19 @@ class FlowObserver(
     private val flow: ThinkingFlow,
     private val strategy: ObservationStrategy,
     private val persister: FlowStatePersister,
-    private val timing: FlowTiming,
     private val now: () -> Long = { System.currentTimeMillis() },
 ) : Runnable {
     @Volatile
     private var running = true
 
+    private val timing: FlowTiming
+        get() = flow.timing
+
     /** 下一次周期观察的绝对时间；0 表示当前状态不需要 tick（INACTIVE） */
     private var nextTickAt: Long = 0
 
-    /** 当前退避间隔；状态迁移时沿用，新消息/发言时重置为 base */
-    private var currentIntervalMs: Long = 0
-
-    /** 到达 max 后的连续 wait 次数；到 2 次仍无动作则退出当前状态 */
-    private var capWaitCount: Int = 0
+    /** 本次观察开始前的状态，用于判断工具是否完成了迁移 */
+    private var stateBeforeObservation: FlowState = FlowState.INACTIVE
 
     /** 连续观察失败次数，用于指数退避，避免模型忙时每秒重试 */
     private var consecutiveRetries: Int = 0
@@ -66,12 +65,11 @@ class FlowObserver(
      * 启动时根据恢复的状态初始化首次 tick
      */
     private fun initializeSchedule() {
-        currentIntervalMs = timing.baseFor(flow.state)
-        capWaitCount = 0
+        flow.resetBackoff()
         nextTickAt = when (flow.state) {
             FlowState.INACTIVE -> 0
-            FlowState.ACTIVE -> now() + currentIntervalMs
-            FlowState.FOCUSED -> if (flow.hasUnobservedMessages()) now() else now() + currentIntervalMs
+            FlowState.ACTIVE -> now() + flow.currentIntervalMs
+            FlowState.FOCUSED -> if (flow.hasUnobservedMessages()) now() else now() + flow.currentIntervalMs
         }
     }
 
@@ -108,26 +106,31 @@ class FlowObserver(
      * ACTIVE：按退避 tick 观察；新消息只入窗、缩短下一次 tick，不立即触发。
      */
     private fun runActive() {
-        when (flow.awaitChange(nextTickAt)) {
-            FlowWakeup.STOPPED -> {
-                running = false
-                return
-            }
-
-            FlowWakeup.MESSAGE, FlowWakeup.TIMEOUT -> Unit
-        }
-
-        // 新消息：重置退避，并把下一次 tick 提前到最多 base；若 tick 已到期则直接观察
-        if (flow.hasUnobservedMessages() && now() < nextTickAt) {
-            currentIntervalMs = timing.baseFor(FlowState.ACTIVE)
-            capWaitCount = 0
-            nextTickAt = minOf(nextTickAt, now() + currentIntervalMs)
+        if (flow.awaitChange(nextTickAt) == FlowWakeup.STOPPED) {
+            running = false
             return
         }
 
-        if (nextTickAt > 0 && now() >= nextTickAt) {
-            val result = observeOnce(ObservationTrigger.PERIODIC)
-            handleResult(result)
+        val currentTime = now()
+        val hasNewMessage = flow.hasUnobservedMessages()
+
+        // 先按“新消息”重置退避，再决定是提前 tick 还是直接观察。
+        // 这样即使消息恰好和 tick 同时到达，也不会出现“只观察、不重置计时”的临界情况。
+        if (hasNewMessage) {
+            flow.resetBackoff()
+            if (currentTime < nextTickAt) {
+                nextTickAt = minOf(nextTickAt, currentTime + flow.currentIntervalMs)
+                return
+            }
+        }
+
+        if (nextTickAt in 1..currentTime) {
+            val trigger = if (hasNewMessage) {
+                ObservationTrigger.NEW_MESSAGE
+            } else {
+                ObservationTrigger.PERIODIC
+            }
+            handleResult(observeOnce(trigger))
         }
     }
 
@@ -145,8 +148,7 @@ class FlowObserver(
         }
 
         if (flow.hasUnobservedMessages()) {
-            currentIntervalMs = timing.baseFor(FlowState.FOCUSED)
-            capWaitCount = 0
+            flow.resetBackoff()
             val result = observeOnce(ObservationTrigger.NEW_MESSAGE)
             handleResult(result)
             return
@@ -162,8 +164,7 @@ class FlowObserver(
      * INACTIVE → ACTIVE 的激活路径：立即观察一次，然后从 ACTIVE 的 base 开始退避。
      */
     private fun activate() {
-        currentIntervalMs = timing.baseFor(FlowState.ACTIVE)
-        capWaitCount = 0
+        flow.resetBackoff()
         transitionTo(FlowState.ACTIVE, "外部消息激活")
 
         val result = observeOnce(ObservationTrigger.ACTIVATION)
@@ -178,6 +179,7 @@ class FlowObserver(
      */
     private fun observeOnce(trigger: ObservationTrigger): ObservationResult {
         val snapshot = flow.snapshot(trigger)
+        stateBeforeObservation = flow.state
         val result = try {
             strategy.observe(flow, snapshot)
         } catch (e: Exception) {
@@ -186,17 +188,22 @@ class FlowObserver(
         }
 
         if (result !is ObservationResult.Retry) {
+            val stateChanged = flow.state != stateBeforeObservation
             lastObservationHadActivity = snapshot.newSequences.isNotEmpty() ||
                     trigger == ObservationTrigger.ACTIVATION ||
                     flow.lastActivityAt > snapshot.lastActivityAt
-            if (lastObservationHadActivity) {
-                currentIntervalMs = timing.baseFor(flow.state)
-                capWaitCount = 0
+            // 状态迁移已经在 ThinkingFlow 内完成并带走了原间隔，这里不能再按“有活动”重置
+            if (lastObservationHadActivity && !stateChanged) {
+                flow.resetBackoff()
+            }
+            // 关注类迁移视为活动，和旧实现保持一致；退出观察不算活动
+            if (stateChanged && flow.state != FlowState.INACTIVE) {
+                flow.markActivity(now())
             }
 
             val maxSequence = snapshot.entries.maxOfOrNull { it.sequence } ?: snapshot.lastObservedSequence
-            flow.markObserved(maxSequence, decisionOf(result))
-            persist()
+            flow.markObserved(maxSequence, decisionOf(result, stateChanged))
+            saveThinkingFlow()
         }
 
         return result
@@ -214,56 +221,43 @@ class FlowObserver(
             ObservationResult.Wait -> {
                 // 激活后的首次观察不计入退避增长，下一次从 base 开始
                 if (lastObservationHadActivity || fromActivation) {
-                    currentIntervalMs = timing.baseFor(flow.state)
-                    capWaitCount = 0
+                    flow.resetBackoff()
                     scheduleNext()
                     logWait()
                     return
                 }
 
                 // 到达 max 后先给两轮观察；两轮仍 wait 就退出当前状态
-                if (currentIntervalMs >= timing.maxFor(flow.state)) {
-                    capWaitCount++
-                    if (capWaitCount >= CAP_WAIT_ROUNDS) {
+                if (flow.currentIntervalMs >= timing.maxFor(flow.state)) {
+                    flow.recordCapWait()
+                    if (flow.capWaitCount >= CAP_WAIT_ROUNDS) {
                         logWait()
                         exitAfterCap()
                         return
                     }
                     scheduleNext()
                 } else {
-                    currentIntervalMs = timing.grow(currentIntervalMs, flow.state)
-                    capWaitCount = 0
+                    flow.growBackoff()
                     scheduleNext()
                 }
                 logWait()
             }
 
-            ObservationResult.Focus -> {
-                if (flow.state != FlowState.FOCUSED) {
-                    transitionTo(FlowState.FOCUSED, "focus_watch")
-                    flow.markActivity(now())
-                    persist()
+            ObservationResult.StateAction -> {
+                // 状态迁移和计时重置已在 ThinkingFlow 的状态切换方法内完成，
+                // 这里只负责把状态变化写进日志并重算下一次 tick。
+                val oldState = stateBeforeObservation
+                val newState = flow.state
+                if (oldState != newState) {
+                    logTransition(oldState, newState, flow.lastTransitionReason ?: "state_action")
+                } else if (flow.hasUnobservedMessages()) {
+                    log.info("观察期间有新消息，优先补一轮观察（stream: {}）", flow.id)
                 }
-                nextTickAt = if (flow.hasUnobservedMessages()) now() else now() + currentIntervalMs
-            }
 
-            ObservationResult.Unfocus -> {
-                if (flow.state == FlowState.FOCUSED) {
-                    transitionTo(FlowState.ACTIVE, "unfocus_watch")
-                    flow.markActivity(now())
-                    persist()
-                }
-                nextTickAt = if (flow.hasUnobservedMessages()) now() else now() + currentIntervalMs
-            }
-
-            ObservationResult.Quit -> {
-                if (flow.hasUnobservedMessages()) {
-                    // 低活性迁移的 pending guard：先补观察，不能把消息丢掉
-                    log.info("观察期间有新消息，推迟退出观察（stream: {}）", flow.id)
-                    nextTickAt = now()
-                } else {
-                    transitionTo(FlowState.INACTIVE, "quit_watch")
-                    nextTickAt = 0
+                nextTickAt = when (newState) {
+                    FlowState.INACTIVE -> 0
+                    FlowState.ACTIVE, FlowState.FOCUSED ->
+                        if (flow.hasUnobservedMessages()) now() else now() + flow.currentIntervalMs
                 }
             }
 
@@ -288,8 +282,7 @@ class FlowObserver(
      */
     private fun exitAfterCap() {
         if (flow.hasUnobservedMessages()) {
-            currentIntervalMs = timing.baseFor(flow.state)
-            capWaitCount = 0
+            flow.resetBackoff()
             scheduleNext()
             return
         }
@@ -312,50 +305,55 @@ class FlowObserver(
     private fun scheduleNext() {
         nextTickAt = when (flow.state) {
             FlowState.INACTIVE -> 0
-            FlowState.ACTIVE, FlowState.FOCUSED -> now() + currentIntervalMs
+            FlowState.ACTIVE, FlowState.FOCUSED -> now() + flow.currentIntervalMs
         }
     }
 
     /**
-     * 状态迁移：沿用并 clamp 当前间隔，重置 cap 轮次，写 INFO 日志。
+     * 观察循环自己触发的迁移（激活、cap 退出）：调用 ThinkingFlow 的统一迁移入口，
+     * 再补持久化和日志。
      */
     private fun transitionTo(newState: FlowState, reason: String) {
         val oldState = flow.state
-        if (oldState == newState) {
+        if (!flow.transitionTo(newState, reason)) {
             return
         }
+        saveThinkingFlow()
+        logTransition(oldState, newState, reason)
+    }
 
-        currentIntervalMs = timing.clamp(currentIntervalMs, newState)
-        capWaitCount = 0
-        flow.transitionTo(newState)
-        persist()
+    private fun logTransition(oldState: FlowState, newState: FlowState, reason: String) {
         log.info(
             "观察状态切换: stream={}, {} -> {}, reason={}, interval={}ms",
-            flow.id, oldState, newState, reason, currentIntervalMs
+            flow.id, oldState, newState, reason, flow.currentIntervalMs
         )
     }
 
     private fun logWait() {
         log.debug(
             "观察决策 wait_and_watch: stream={}, state={}, interval={}ms, capRound={}/{}",
-            flow.id, flow.state, currentIntervalMs, capWaitCount, CAP_WAIT_ROUNDS
+            flow.id, flow.state, flow.currentIntervalMs, flow.capWaitCount, CAP_WAIT_ROUNDS
         )
     }
 
-    private fun persist() {
+    private fun saveThinkingFlow() {
         try {
-            persister.persist(flow)
+            persister.saveThinkingFlow(flow)
         } catch (e: Exception) {
             log.warn("保存思维流状态失败（stream: {}）", flow.id, e)
         }
     }
 
-    private fun decisionOf(result: ObservationResult): String {
+    private fun decisionOf(result: ObservationResult, stateChanged: Boolean): String {
         return when (result) {
             ObservationResult.Wait -> "wait"
-            ObservationResult.Focus -> "focus"
-            ObservationResult.Unfocus -> "unfocus"
-            ObservationResult.Quit -> "quit"
+            ObservationResult.StateAction -> {
+                if (stateChanged) {
+                    flow.lastTransitionReason ?: "state_action"
+                } else {
+                    "state_action"
+                }
+            }
             is ObservationResult.Retry -> "retry"
         }
     }

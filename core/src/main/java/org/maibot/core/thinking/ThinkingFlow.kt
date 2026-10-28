@@ -1,11 +1,13 @@
 package org.maibot.core.thinking
 
+import org.maibot.core.thinking.observer.FlowTiming
 import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.storage.db.dao.InteractionStream.Companion.idGen
 import org.maibot.sdk.storage.db.dao.Message
 import org.maibot.sdk.storage.domain.StreamType
 import org.maibot.sdk.util.MapperUtils
 import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.Volatile
@@ -13,8 +15,8 @@ import kotlin.concurrent.Volatile
 /**
  * 思维流组件
  *
- * 思维流是对交互流的思考与决策单元：维护观察窗口、观察状态、活动时间和版本号，
- * 并在窗口变化时唤醒观察线程。它不依赖模型和工具，只做状态容器。
+ * 思维流是对交互流的思考与决策单元：维护观察窗口、观察状态、活动时间、退避计时
+ * 和版本号，并在窗口变化时唤醒观察线程。它不依赖模型和工具。
  *
  * 观察循环在 [org.maibot.core.thinking.observer.FlowObserver] 中，
  * 具体「这次观察做什么」由 ObservationStrategy 决定。
@@ -24,6 +26,8 @@ class ThinkingFlow(
     private val observationWindowSize: Int,
     /** 交互流 ID */
     val id: String?,
+    /** 当前观察循环的退避参数；状态迁移和计时重置都依赖它 */
+    val timing: FlowTiming,
 ) {
     /** 交互流观察窗口 */
     private val observationWindow: Deque<ObservationEntry> = ArrayDeque()
@@ -63,6 +67,24 @@ class ThinkingFlow(
     @Volatile
     var lastDecision: String? = null
         private set
+
+    /** 当前退避间隔；状态迁移时 clamp 到目标状态，新消息/发言时重置为 base */
+    @Volatile
+    var currentIntervalMs: Long = 0
+        private set
+
+    /** 到达 max 后的连续 wait 次数 */
+    @Volatile
+    var capWaitCount: Int = 0
+        private set
+
+    /** 最近一次状态迁移原因，供观察线程记录日志和决策摘要 */
+    @Volatile
+    var lastTransitionReason: String? = null
+        private set
+
+    /** 最近一次已经交给观察线程的窗口版本，避免同一条未观察消息反复唤醒等待 */
+    private var lastWakeVersion: Long = 0
 
     /**
      * 追加一条外部消息，并唤醒观察线程
@@ -204,10 +226,14 @@ class ThinkingFlow(
     fun hasUnobservedMessages(): Boolean {
         lock.lock()
         try {
-            return observationWindow.any { it.isExternal && it.sequence > lastObservedSequence }
+            return hasUnobservedMessagesLocked()
         } finally {
             lock.unlock()
         }
+    }
+
+    private fun hasUnobservedMessagesLocked(): Boolean {
+        return observationWindow.any { it.isExternal && it.sequence > lastObservedSequence }
     }
 
     /**
@@ -230,7 +256,7 @@ class ThinkingFlow(
     /**
      * 刷新活动时间
      *
-     * 只应由外部消息到达、Bot 成功发言、状态迁移调用；周期 tick 和 wait 不算活动。
+     * 由外部消息到达、Bot 成功发言和观察循环在关注类迁移后调用；周期 tick 和 wait 不算活动。
      */
     fun markActivity(now: Long = System.currentTimeMillis()) {
         lock.lock()
@@ -242,16 +268,95 @@ class ThinkingFlow(
     }
 
     /**
-     * 应用状态迁移；状态迁移由 FlowObserver 单线程执行
+     * 把当前退避重置回当前状态的 base
+     *
+     * 用于新消息和成功发言后的重新计时；状态迁移只 clamp 间隔，不重置到 base。
      */
-    fun transitionTo(newState: FlowState) {
+    fun resetBackoff() {
+        lock.lock()
+        try {
+            currentIntervalMs = timing.baseFor(state)
+            capWaitCount = 0
+        } finally {
+            lock.unlock()
+        }
+    }
+
+    /**
+     * 未到 cap 时把当前间隔增长一档
+     */
+    fun growBackoff() {
+        lock.lock()
+        try {
+            currentIntervalMs = timing.grow(currentIntervalMs, state)
+            capWaitCount = 0
+        } finally {
+            lock.unlock()
+        }
+    }
+
+    /**
+     * 到达 cap 后累计一轮无动作观察
+     */
+    fun recordCapWait() {
+        lock.lock()
+        try {
+            capWaitCount++
+        } finally {
+            lock.unlock()
+        }
+    }
+
+    /**
+     * 进入关注状态
+     *
+     * 状态切换、间隔 clamp 和 cap 计数重置都在这里完成，工具只负责触发。
+     */
+    fun focus(): Boolean {
+        return transitionTo(FlowState.FOCUSED, "focus_watch")
+    }
+
+    /**
+     * 退出关注，回到周期观察
+     *
+     * 状态切换、间隔 clamp 和 cap 计数重置都在这里完成，工具只负责触发。
+     */
+    fun unfocus(): Boolean {
+        return transitionTo(FlowState.ACTIVE, "unfocus_watch")
+    }
+
+    /**
+     * 退出观察
+     *
+     * 仍有未观察消息时不迁移，交给观察线程立即补一轮，避免消息被丢掉。
+     */
+    fun quit(): Boolean {
+        return !hasUnobservedMessages() && transitionTo(FlowState.INACTIVE, "quit_watch")
+    }
+
+    /**
+     * 应用一次状态迁移
+     *
+     * 状态、间隔、cap 计数和迁移原因一次更新，避免观察线程和工具各自维护一份计时状态。
+     * 活动时间不在这里刷新：状态迁移不是「新消息/发言」，不能污染退避重置判断。
+     *
+     * @return 是否真的发生了状态变化
+     */
+    fun transitionTo(
+        newState: FlowState,
+        reason: String,
+    ): Boolean {
         lock.lock()
         try {
             if (stopped || state == newState) {
-                return
+                return false
             }
             state = newState
+            currentIntervalMs = timing.clamp(currentIntervalMs, newState)
+            capWaitCount = 0
+            lastTransitionReason = reason
             changeCondition.signalAll()
+            return true
         } finally {
             lock.unlock()
         }
@@ -270,6 +375,12 @@ class ThinkingFlow(
                 if (stopped) {
                     return FlowWakeup.STOPPED
                 }
+                // 进入等待前窗口里可能已经有未观察消息；只在 version 变化时唤醒会漏掉这类消息。
+                // lastWakeVersion 保证同一条消息只唤醒一次，避免调用方还没到 tick 时反复空转。
+                if (version != lastWakeVersion) {
+                    lastWakeVersion = version
+                    return FlowWakeup.MESSAGE
+                }
                 if (version != startVersion) {
                     return FlowWakeup.MESSAGE
                 }
@@ -283,7 +394,9 @@ class ThinkingFlow(
                 if (remaining <= 0) {
                     return FlowWakeup.TIMEOUT
                 }
-                changeCondition.awaitNanos(remaining * 1_000_000)
+                // awaitNanos 会释放锁并阻塞到 signal/中断/超时，不是轮询；
+                // while 只用于处理虚假唤醒和状态变化后的重新判断。
+                changeCondition.awaitNanos(TimeUnit.MILLISECONDS.toNanos(remaining))
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()

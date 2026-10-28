@@ -1,6 +1,6 @@
 package org.maibot.core.tool
 
-import org.maibot.core.chat.speech.SpeakTool
+import org.maibot.core.thinking.tool.SpeakTool
 import org.maibot.core.thinking.tool.FocusWatchTool
 import org.maibot.core.thinking.tool.QuitWatchTool
 import org.maibot.core.thinking.tool.UnfocusWatchTool

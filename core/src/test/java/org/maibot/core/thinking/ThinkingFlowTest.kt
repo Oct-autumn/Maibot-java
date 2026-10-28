@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.maibot.core.thinking.observer.FlowTiming
 import org.maibot.sdk.storage.db.dao.InteractionEntity
 import org.maibot.sdk.storage.db.dao.Message
 
@@ -28,7 +29,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `外部消息进入窗口后成为新消息，但不直接改状态`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
 
         flow.addExternalMessage(message(1, "在吗"))
 
@@ -42,7 +43,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `Bot 消息不增加版本且标记回复`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         flow.addExternalMessage(message(1, "在吗"))
 
         flow.addBotMessage(message(2, "在的", bot = true), listOf(1))
@@ -58,7 +59,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `标记已观察后新消息集合清空`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         flow.addExternalMessage(message(1, "在吗"))
 
         flow.markObserved(1L, "wait")
@@ -71,7 +72,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `从历史恢复时按 reply_to 标记已回复且不重放旧消息`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         val botMessage = message(2, "在的", bot = true).apply {
             rawContentJson = """{"text":"在的","reply_to_sequence":[1]}"""
         }
@@ -87,7 +88,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `恢复状态与观察位置`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         flow.restoreHistory(listOf(message(1, "在吗"), message(2, "在的", bot = true)))
 
         flow.restoreState(
@@ -108,7 +109,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `窗口超过容量时淘汰最旧消息`() {
-        val flow = ThinkingFlow(2, "P-1")
+        val flow = newFlow(2)
 
         flow.addExternalMessage(message(1, "a"))
         flow.addExternalMessage(message(2, "b"))
@@ -120,7 +121,7 @@ class ThinkingFlowTest {
 
     @Test
     fun `等待超时返回 TIMEOUT`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
 
         val result = flow.awaitChange(System.currentTimeMillis() + 20)
 
@@ -128,8 +129,21 @@ class ThinkingFlowTest {
     }
 
     @Test
+    fun `等待前已有未观察消息时立即返回 MESSAGE`() {
+        val flow = newFlow()
+        flow.addExternalMessage(message(1, "在吗"))
+
+        val result = flow.awaitChange(System.currentTimeMillis() + 1_000)
+        assertEquals(FlowWakeup.MESSAGE, result)
+
+        // 同一条未观察消息只唤醒一次，下一次应正常等到超时，而不是空转
+        val second = flow.awaitChange(System.currentTimeMillis() + 20)
+        assertEquals(FlowWakeup.TIMEOUT, second)
+    }
+
+    @Test
     fun `等待新消息返回 MESSAGE`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         val worker = Thread {
             Thread.sleep(20)
             flow.addExternalMessage(message(1, "在吗"))
@@ -144,14 +158,68 @@ class ThinkingFlowTest {
 
     @Test
     fun `停止后等待立即返回 STOPPED`() {
-        val flow = ThinkingFlow(10, "P-1")
+        val flow = newFlow()
         flow.stopObserving()
 
         assertEquals(FlowWakeup.STOPPED, flow.awaitChange(null))
         assertNull(flow.persistedState().lastDecision)
     }
 
+    @Test
+    fun `focus 迁移沿用并 clamp 间隔，同时清空 cap 计数`() {
+        val flow = newFlow()
+        flow.addExternalMessage(message(1, "在吗"))
+        flow.transitionTo(FlowState.ACTIVE, "test")
+        flow.resetBackoff()
+        flow.growBackoff()
+        flow.recordCapWait()
+
+        assertTrue(flow.focus())
+
+        assertEquals(FlowState.FOCUSED, flow.state)
+        assertEquals(60_000, flow.currentIntervalMs)
+        assertEquals(0, flow.capWaitCount)
+        assertTrue(flow.lastActivityAt > 0)
+    }
+
+    @Test
+    fun `unfocus 把 FOCUSED 的间隔 clamp 回 ACTIVE 上限`() {
+        val flow = newFlow()
+        flow.transitionTo(FlowState.FOCUSED, "test")
+        repeat(5) { flow.growBackoff() }
+        assertEquals(300_000, flow.currentIntervalMs)
+
+        assertTrue(flow.unfocus())
+
+        assertEquals(FlowState.ACTIVE, flow.state)
+        assertEquals(120_000, flow.currentIntervalMs)
+        assertEquals(0, flow.capWaitCount)
+    }
+
+    @Test
+    fun `quit 遇到未观察消息时保持当前状态`() {
+        val flow = newFlow()
+        flow.transitionTo(FlowState.FOCUSED, "test")
+        flow.addExternalMessage(message(1, "在吗"))
+
+        assertFalse(flow.quit())
+
+        assertEquals(FlowState.FOCUSED, flow.state)
+    }
+
+    private fun newFlow(capacity: Int = 10): ThinkingFlow {
+        return ThinkingFlow(capacity, "P-1", TIMING)
+    }
+
     companion object {
         private const val BOT_ENTITY_ID = 999L
+
+        private val TIMING = FlowTiming(
+            activeBaseIntervalMs = 30_000,
+            activeMaxIntervalMs = 120_000,
+            focusBaseIntervalMs = 15_000,
+            focusMaxIntervalMs = 300_000,
+            growthFactor = 2.0,
+        )
     }
 }

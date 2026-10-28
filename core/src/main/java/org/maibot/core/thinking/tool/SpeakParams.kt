@@ -1,4 +1,4 @@
-package org.maibot.core.chat.speech
+package org.maibot.core.thinking.tool
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonPropertyDescription

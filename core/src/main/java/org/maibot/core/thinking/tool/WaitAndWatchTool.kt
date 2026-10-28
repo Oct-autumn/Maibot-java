@@ -9,10 +9,10 @@ import org.maibot.sdk.tool.ToolResult
 /**
  * 继续观察工具
  *
- * 只表达「保持当前观察状态」的决策；状态迁移由 FlowObserver 执行。
+ * 只表达「保持当前观察状态」的决策；退避计时由观察循环处理。
  */
 @Component
-class WaitAndWatchTool : Tool(NAME, DESCRIPTION, EmptyParams::class.java) {
+class WaitAndWatchTool : Tool(NAME, DESCRIPTION, EmptyParams::class.java), TerminalObservationTool {
     override fun execute(context: ToolCallContext): ToolResult {
         return ToolResult("保持当前观察状态。")
     }

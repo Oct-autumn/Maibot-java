@@ -2,14 +2,24 @@ package org.maibot.sdk.storage.db.dao
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.FetchType
+import jakarta.persistence.ForeignKey
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.MapsId
+import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.UpdateTimestamp
+import java.time.Instant
 
 /**
  * 思维流观察状态持久化实体
  *
  * 一个交互流对应一行；只保存状态机需要的元数据，观察窗口内容仍从
  * [Message] 表恢复。
+ *
+ * `stream_id` 既是主键也是外键；用 [stream] 的 `@OneToOne` + `@MapsId`
+ * 表达一对一关联，[streamId] 保留给按交互流 ID 查询/恢复使用。
  */
 @Entity
 @Table(name = "thinking_flow_state")
@@ -18,6 +28,17 @@ class ThinkingFlowState {
     @Id
     @Column(name = "stream_id", nullable = false)
     var streamId: String? = null
+
+    @JvmField
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @MapsId
+    @JoinColumn(
+        name = "stream_id",
+        referencedColumnName = "id",
+        nullable = false,
+        foreignKey = ForeignKey(name = "FK_ThinkingFlowState_InteractionStream"),
+    )
+    var stream: InteractionStream? = null
 
     /**
      * 观察状态：INACTIVE / ACTIVE / FOCUSED
@@ -47,7 +68,7 @@ class ThinkingFlowState {
     @Column(name = "last_decision")
     var lastDecision: String? = null
 
-    @JvmField
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: Long = 0
+    @UpdateTimestamp
+    var updatedAt: Instant? = null
 }

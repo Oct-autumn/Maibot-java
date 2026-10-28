@@ -1,10 +1,8 @@
 package org.maibot.core.thinking
 
-import org.maibot.core.config.CoreConfig
 import org.maibot.core.ioc.Instance
 import org.maibot.core.persistence.DatabaseServiceImpl
 import org.maibot.core.thinking.observer.FlowObserver
-import org.maibot.core.thinking.observer.FlowTiming
 import org.maibot.core.thinking.observer.ObservationStrategy
 import org.maibot.core.util.TaskExecuteServiceImpl
 import org.maibot.sdk.exceptions.DbOperationException
@@ -13,8 +11,11 @@ import org.maibot.sdk.ioc.Component
 import org.maibot.sdk.ioc.DestroyableComponent
 import org.maibot.sdk.ioc.Value
 import org.maibot.sdk.manager.MessageManager
+import org.maibot.sdk.manager.ThinkingFlowStateStore
+import org.maibot.sdk.storage.db.DatabaseService
 import org.maibot.sdk.storage.db.dao.InteractionStream
 import org.maibot.sdk.storage.db.dao.Message
+import org.maibot.sdk.storage.db.dao.ThinkingFlowState
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -39,15 +40,14 @@ class ThinkingFlowManager
     private val observationStrategy: ObservationStrategy,
     private val stateStore: ThinkingFlowStateStore,
     @param:Value($$"${chat.history_limit}") private val historyLimit: Int,
-    @param:Value($$"${thinking}") private val thinkingConfig: CoreConfig.Thinking,
-) : DestroyableComponent {
+) : DestroyableComponent, FlowStatePersister {
 
     /**
      * 初始化思维流管理器：从数据库恢复已有的交互流和观察状态，并启动观察线程
      */
     fun initialize() {
         val persistedStates = try {
-            stateStore.loadAll()
+            loadAllStates()
         } catch (e: Exception) {
             log.warn("从数据库加载思维流状态失败，全部按未持久化处理", e)
             emptyMap()
@@ -111,13 +111,13 @@ class ThinkingFlowManager
 
         // 状态校正后立即回写，保证下次重启读到的是一致的快照
         try {
-            stateStore.save(streamId, restored)
+            saveState(streamId, restored)
         } catch (e: Exception) {
             log.warn("回写思维流状态失败: {}", streamId, e)
         }
 
         taskExecutorService.submit(true) {
-            FlowObserver(flow, observationStrategy, stateStore, FlowTiming.from(thinkingConfig)).run()
+            FlowObserver(flow, observationStrategy, this).run()
         }
 
         log.debug("已创建思维流并启动观察线程: {}, state={}", streamId, restored.state)
@@ -185,13 +185,85 @@ class ThinkingFlowManager
             .toMap()
 
         try {
-            stateStore.saveAll(states)
+            saveAllStates(states)
         } catch (e: Exception) {
             log.warn("关闭时保存思维流状态失败", e)
         }
 
         for (flow in flowRegistry.all()) {
             flow.stopObserving()
+        }
+    }
+
+    /**
+     * 持久化单个流；实现 [FlowStatePersister]，供观察线程在观察结束后调用。
+     */
+    override fun saveThinkingFlow(flow: ThinkingFlow) {
+        val streamId = flow.id ?: return
+        saveState(streamId, flow.persistedState())
+    }
+
+    private fun loadAllStates(): Map<String, PersistedFlowState> {
+        return databaseService.exec { em ->
+            stateStore.loadAll(em)
+                .mapNotNull { entity ->
+                    val streamId = entity.streamId ?: entity.stream?.id ?: return@mapNotNull null
+                    val state = parseState(streamId, entity.state) ?: return@mapNotNull null
+                    streamId to PersistedFlowState(
+                        state = state,
+                        lastActivityAt = entity.lastActivityAt,
+                        lastObservedSequence = entity.lastObservedSequence,
+                        lastDecision = entity.lastDecision,
+                    )
+                }
+                .toMap()
+        }
+    }
+
+    private fun saveState(streamId: String, state: PersistedFlowState) {
+        databaseService.exec { em ->
+            DatabaseService.execInTransaction(em) {
+                val entity = em.find(ThinkingFlowState::class.java, streamId)
+                    ?: ThinkingFlowState().apply { this.streamId = streamId }
+                applyState(entity, state)
+                stateStore.saveThinkingFlow(em, entity)
+            }
+        }
+    }
+
+    private fun saveAllStates(states: Map<String, PersistedFlowState>) {
+        if (states.isEmpty()) {
+            return
+        }
+
+        databaseService.exec { em ->
+            DatabaseService.execInTransaction(em) {
+                val entities = states.map { (streamId, state) ->
+                    val entity = em.find(ThinkingFlowState::class.java, streamId)
+                        ?: ThinkingFlowState().apply { this.streamId = streamId }
+                    applyState(entity, state)
+                    entity
+                }
+                stateStore.saveAll(em, entities)
+            }
+        }
+    }
+
+    private fun applyState(entity: ThinkingFlowState, state: PersistedFlowState) {
+        entity.state = state.state.name
+        entity.lastActivityAt = state.lastActivityAt
+        entity.lastObservedSequence = state.lastObservedSequence
+        entity.lastDecision = state.lastDecision
+    }
+
+    private fun parseState(streamId: String, value: String?): FlowState? {
+        if (value == null) {
+            log.warn("思维流 {} 的状态为空，忽略该状态行", streamId)
+            return null
+        }
+        return runCatching { FlowState.valueOf(value) }.getOrElse {
+            log.warn("思维流 {} 的状态值非法（{}），按 INACTIVE 处理", streamId, value)
+            null
         }
     }
 

@@ -1,5 +1,7 @@
-package org.maibot.core.chat.speech
+package org.maibot.core.thinking.tool
 
+import org.maibot.core.chat.speech.ConversationTarget
+import org.maibot.core.chat.speech.SpeechGenerator
 import org.maibot.core.chat.support.BotMessagePersister
 import org.maibot.core.msg.OutgoingMessageSender
 import org.maibot.core.thinking.FlowState

@@ -1,12 +1,14 @@
 package org.maibot.core.thinking.observer
 
-import org.maibot.core.chat.speech.SpeakTool
 import org.maibot.core.config.CoreConfig
 import org.maibot.core.model.ModelCaller
 import org.maibot.core.thinking.ObservationSnapshot
 import org.maibot.core.thinking.ThinkingFlow
 import org.maibot.core.thinking.tool.FocusWatchTool
 import org.maibot.core.thinking.tool.QuitWatchTool
+import org.maibot.core.thinking.tool.SpeakTool
+import org.maibot.core.thinking.tool.StateActionTool
+import org.maibot.core.thinking.tool.TerminalObservationTool
 import org.maibot.core.thinking.tool.UnfocusWatchTool
 import org.maibot.core.thinking.tool.WaitAndWatchTool
 import org.maibot.sdk.ioc.AutoInject
@@ -30,7 +32,7 @@ import java.util.UUID
  * ObserverAI 策略
  *
  * 调观察模型，执行它返回的工具调用，把工具结果回灌模型，直到它调用终止工具。
- * 状态迁移不在这里执行；这里只返回 [ObservationResult]。
+ * 状态迁移由工具触发、由 ThinkingFlow 完成；这里只负责工具循环和结果归类。
  */
 @Component
 class ObserverAiStrategy
@@ -95,7 +97,12 @@ class ObserverAiStrategy
             messages.add(MessageContextItem.ofAssistantWithToolCalls(emptyList(), calls))
 
             for (call in calls) {
-                val result = executeTool(flow, snapshot, call, spoke)
+                val tool = toolRegistry.get(call.name)
+                val result = if (tool == null) {
+                    ToolResult("未知工具: ${call.name}", isError = true)
+                } else {
+                    executeTool(flow, snapshot, call, tool, spoke)
+                }
                 messages.add(
                     MessageContextItem.ofTool(
                         listOf(MessageContextItem.Content.ofText(result.content)),
@@ -107,7 +114,13 @@ class ObserverAiStrategy
                     spoke = true
                 }
 
-                terminalResult(call.name)?.let { return it }
+                // 终止工具由自身实现触发状态切换，这里只按类型结束本轮
+                if (tool is StateActionTool) {
+                    return ObservationResult.StateAction
+                }
+                if (tool is TerminalObservationTool) {
+                    return ObservationResult.Wait
+                }
             }
         }
 
@@ -119,14 +132,12 @@ class ObserverAiStrategy
         flow: ThinkingFlow,
         snapshot: ObservationSnapshot,
         call: ToolCall,
+        tool: Tool,
         spoke: Boolean,
     ): ToolResult {
         if (call.name == SpeakTool.TOOL_NAME && spoke) {
             return ToolResult("本次观察已经发言过一次，不能重复发言", isError = true)
         }
-
-        val tool: Tool = toolRegistry.get(call.name)
-            ?: return ToolResult("未知工具: ${call.name}", isError = true)
 
         return try {
             tool.execute(
@@ -141,16 +152,6 @@ class ObserverAiStrategy
         } catch (e: Exception) {
             log.error("工具执行失败（stream: {}, tool: {}）", flow.id, call.name, e)
             ToolResult("工具执行失败: ${e.message}", isError = true)
-        }
-    }
-
-    private fun terminalResult(toolName: String): ObservationResult? {
-        return when (toolName) {
-            WaitAndWatchTool.NAME -> ObservationResult.Wait
-            FocusWatchTool.NAME -> ObservationResult.Focus
-            UnfocusWatchTool.NAME -> ObservationResult.Unfocus
-            QuitWatchTool.NAME -> ObservationResult.Quit
-            else -> null
         }
     }
 
